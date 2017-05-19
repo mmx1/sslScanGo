@@ -13,11 +13,12 @@ import "C"
 
 import (
     "log"
-    // "fmt"
+    "fmt"
     "strings"
+    "sync"
     "time"
     // "crypto/tls"
-    "github.com/mmx1/openssl"
+    "github.com/mmx1/opensslgo"
     // "github.com/davecgh/go-spew/spew"
 )
 
@@ -109,10 +110,12 @@ func testConnection() {
 
 
 func (s sslCheckOptions) testProtocolCipher (cipherName string) {
+  // fmt.Println("trying", s.host, cipherName)
+
   const request = "GET / HTTP/1.0\r\nUser-Agent: SSLScan\r\nHost: %s\r\n\r\n"
 
   //creates TLS context (SSL disabled by default)
-  context, err := openssl.NewCtxWithVersion(0x05)
+  context, err := openssl.NewCtxWithVersion(openssl.TLSv1_2)
   if err != nil {
           log.Fatal(err)
   }
@@ -126,6 +129,7 @@ func (s sslCheckOptions) testProtocolCipher (cipherName string) {
   if err != nil {
     //inspect for weak dh key
     errorString := err.Error()
+    //log.Println(errorString)
     if strings.Contains(errorString, "dh key too small") {
       log.Print("dh key too small")
     }
@@ -134,35 +138,59 @@ func (s sslCheckOptions) testProtocolCipher (cipherName string) {
   }
   defer conn.Close()
 
-  // C.SSL_connect(context)
-
   sslCipherName, err := conn.CurrentCipher()
   if err != nil {
     log.Fatal(err)
   }
   //fmt.Sprintf("%s accepted cipher %s", s.host, sslCipherName)
-  println(sslCipherName)
   keyId, keyBits, curveName := conn.GetServerTmpKey()
-  println(keyId, keyBits, curveName)
+  fmt.Println(s.host, sslCipherName, keyId, keyBits, curveName)
 
 }
 
-func (s sslCheckOptions) testProtocolCiphers (limiter  <-chan time.Time) {
-  <-limiter
-  s.testProtocolCipher(concatenateCiphers(rsaCiphers))
-  s.testProtocolCipher(concatenateCiphers(ecdheCiphers))
+func (s sslCheckOptions) testProtocolCiphers (globalLimiter  <-chan time.Time) {
+  var wg sync.WaitGroup
+  hostLimiter := time.Tick(time.Second)
+
+  wg.Add(1)
+  go func () {
+      defer wg.Done()
+      <-hostLimiter
+      <-globalLimiter
+      s.testProtocolCipher(concatenateCiphers(rsaCiphers))
+  }()
+
+  wg.Add(1)
+  go func () {
+    defer wg.Done()
+    <-hostLimiter
+    <-globalLimiter
+    s.testProtocolCipher(concatenateCiphers(ecdheCiphers))
+  }()
+  
 
   for _, cipher := range dhCiphers {
-     <-limiter
-     //fmt.Println("Tick at", time.Now())
+    wg.Add(1)
+    go func () {
+      defer wg.Done()
+      <-hostLimiter
+      <-globalLimiter
      go s.testProtocolCipher(cipher)
+    }()
   }
 
   for _, cipher := range dheCiphers {
-     <-limiter
-     //fmt.Println("Tick at", time.Now())
+     wg.Add(1)
+    go func () {
+      defer wg.Done()
+      <-hostLimiter
+      <-globalLimiter
      go s.testProtocolCipher(cipher)
+    }()
   }
+
+  wg.Wait()
+  fmt.Println(s.host, "Done")
 }
 
 func testHost() {
@@ -175,12 +203,11 @@ func testHost() {
 
 }
 
-func oldMain() {
+func scanHost(hostName string, globalLimiter <-chan time.Time) {
+  //log.Println("scanHost" , hostName)
 
-  hostname := "expired.badssl.com:443"
-  options := sslCheckOptions{ hostname, 443}
+  options := sslCheckOptions{ hostName, 443}
 
-  limiter := time.Tick(time.Millisecond * 500)
-  options.testProtocolCiphers(limiter)
+  options.testProtocolCiphers(globalLimiter)
 
 }
