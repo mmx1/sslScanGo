@@ -25,7 +25,7 @@ func main() {
 
   flag.Parse()
   tail := flag.Args()
-
+  
   if len(tail) < 1 {
     fmt.Println("Error, requires an filename argument")
     return
@@ -42,7 +42,7 @@ func main() {
   scanner := bufio.NewScanner(f)
   for scanner.Scan() {
     tokens := strings.Split(scanner.Text(), ",")
-    //fmt.Println(tokens)
+    // fmt.Println(tokens)
     if len(tokens) < 2 {
       continue
     }
@@ -58,7 +58,7 @@ func main() {
     }
 
     host := tokens[1] + ":443"
-    
+    // fmt.Println(host)
     wg.Add(1)
     go func() {
       defer wg.Done()
