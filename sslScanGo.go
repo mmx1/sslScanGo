@@ -100,7 +100,7 @@ func concatenateCiphers (ciphers []string) (string) {
   return joinedCiphers
 }
 
-type sslCheckOptions struct {
+  type sslCheckOptions struct {
   host string
   port int
 }
@@ -126,14 +126,23 @@ func (s sslCheckOptions) testProtocolCipher (cipherName string) (int){
     log.Fatal(err)
   }
 
+  conn, err:=s.testHost()
+  if err != nil {
+    log.Print("Lost connection to Host: ", err)
+    return -1
+  }
+
+  conn_ssl, err := openssl.Client(conn, context)
+  check(err)
+  err = conn_ssl.Handshake()  
   //var dialer net.Dialer
   //dialer.Timeout = time.Duration(30)*time.Second
 
-  conn, err := openssl.Dial("tcp", s.host, context, 0)
+  //conn, err := openssl.Dial("tcp", s.host, context, 0)
   if err != nil {
     //inspect for weak dh key
     errorString := err.Error()
-    log.Println(errorString)
+    //log.Println(errorString)
     if strings.Contains(errorString, "dh key too small") {
       log.Print("dh key too small")
     }
@@ -148,14 +157,28 @@ func (s sslCheckOptions) testProtocolCipher (cipherName string) (int){
     return 0
     //fmt.Sprintf("%s rejected cipher %s", s.host, cipherName)
   }
-  defer conn.Close()
+  defer conn_ssl  .Close()
 
-  sslCipherName, err := conn.CurrentCipher()
+  sslCipherName, err := conn_ssl.CurrentCipher()
   if err != nil {
     log.Fatal(err)
   }
+
+  cert, err := conn_ssl.PeerCertificate()
+  if err != nil {
+    log.Fatal(err)
+  }
+  pkey, err := cert.PublicKey()
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  key_size := openssl.PKeySize(pkey)
+  fmt.Println("Encryption Key Size (bits): ", key_size*8)
+
+
   //fmt.Sprintf("%s accepted cipher %s", s.host, sslCipherName)
-  keyId, keyBits, curveName := conn.GetServerTmpKey()
+  keyId, keyBits, curveName := conn_ssl.GetServerTmpKey()
   fmt.Println(s.host, sslCipherName, keyId, keyBits, curveName)
   return 0
 }
@@ -221,29 +244,25 @@ func (s sslCheckOptions) testProtocolCiphers (globalLimiter  <-chan time.Time) {
   fmt.Println(s.host, "Done")
 }
 
-func (o sslCheckOptions) testHost() (net.Conn) {
-  // ctx, err := NewCtx()
-  // if err != nil {
-  //   log.Fatal(err)
-  // }
+func (o sslCheckOptions) testHost() (net.Conn, error) {
 
   conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
   if err != nil {
-    fmt.Println("Error in connection Start ", err.Error())
-    return nil
+    return nil, err
   }
-  return conn
+  return conn, nil
 }
 
 func scanHost(hostName string, globalLimiter <-chan time.Time) {
   log.Println("scanHost" , hostName)
 
   options := sslCheckOptions{ hostName, 443}
-
-  if conn:=options.testHost(); conn != nil {
+  conn, err:=options.testHost();
+  if err != nil {
+    log.Print("Error in connection Start ", err)
     return
   }
-
+  conn.Close()
   options.testProtocolCiphers(globalLimiter)
 
 }
