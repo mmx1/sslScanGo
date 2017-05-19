@@ -20,5 +20,5 @@ And run:
 
 Dependencies
 ============
-This has been confirmed to work with OpenSSL 1.0.2d and go 1.5.1. Known issues with go 1.2 and requires OpenSSL > 1.0.2 for SSL_get_server_tmp_key.
+This has been confirmed to work with OpenSSL 1.0.2d and go 1.5.1 on Ubuntu 15.10. Known issues with go 1.2 and requires OpenSSL > 1.0.2 for SSL_get_server_tmp_key.
 

@@ -12,11 +12,10 @@ package main
 import "C"
 
 import (
-
     "log"
     // "fmt"
-    "time"
     "strings"
+    "time"
     // "crypto/tls"
     "github.com/mmx1/openssl"
     // "github.com/davecgh/go-spew/spew"
@@ -176,7 +175,8 @@ func testHost() {
 
 }
 
-func main() {
+func oldMain() {
+
   hostname := "expired.badssl.com:443"
   options := sslCheckOptions{ hostname, 443}
 
