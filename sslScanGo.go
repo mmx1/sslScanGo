@@ -18,7 +18,7 @@ import (
     "time"
     "strings"
     // "crypto/tls"
-    "github.com/spacemonkeygo/openssl"
+    "github.com/mmx1/openssl"
     // "github.com/davecgh/go-spew/spew"
 )
 
