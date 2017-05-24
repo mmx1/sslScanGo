@@ -15,254 +15,185 @@ import (
     "log"
     "fmt"
     "strings"
-    "sync"
     "time"
     "net" 
-    // "crypto/tls"
     "github.com/mmx1/opensslgo"
-    // "github.com/davecgh/go-spew/spew"
 )
 
-var rsaCiphers = []string{"AES128-SHA256",
-                          "AES256-SHA256",
-                          "AES128-GCM-SHA256",
-                          "AES256-GCM-SHA384"}
-
-var dhCiphers = []string{"DH-RSA-AES128-SHA256", 
-                           "DH-RSA-AES256-SHA256",
-                           "DH-RSA-AES128-GCM-SHA256",
-                           "DH-RSA-AES256-GCM-SHA384"}
-
-var anonDHCiphers = []string{"ADH-AES128-SHA256",
-                             "ADH-AES256-SHA256",
-                             "ADH-AES128-GCM-SHA256",
-                             "ADH-AES256-GCM-SHA384"}
-
-var anonECDHCiphers = []string{"AECDH-NULL-SHA",
-                             "AECDH-RC4-SHA",
-                             "AECDH-DES-CBC3-SHA",
-                             "AECDH-AES128-SHA",
-                             "AECDH-AES256-SHA"}
-var dheCiphers = []string{
-
-                           "DHE-RSA-AES128-SHA256",
-                           "DHE-RSA-AES256-SHA256",
-                           "DHE-RSA-AES128-GCM-SHA256",
-                           "DHE-RSA-AES256-GCM-SHA384",
-
-                           "DHE-DSS-AES128-SHA256",
-                           "DHE-DSS-AES256-SHA256",
-                           "DHE-DSS-AES128-GCM-SHA256",
-                           "DHE-DSS-AES256-GCM-SHA384"}
-
-var ecdheCiphers = []string{"ECDHE-RSA-AES128-SHA256",
-                             "ECDHE-RSA-AES256-SHA384",
-                             "ECDHE-RSA-AES128-GCM-SHA256",
-                             "ECDHE-RSA-AES256-GCM-SHA384",
-
-                             "ECDHE-ECDSA-AES128-SHA256",
-                             "ECDHE-ECDSA-AES256-SHA384",
-                             "ECDHE-ECDSA-AES128-GCM-SHA256",
-                             "ECDHE-ECDSA-AES256-GCM-SHA384",
-
-                            "ECDHE-RSA-NULL-SHA",
-                            "ECDHE-RSA-RC4-SHA",
-                            "ECDHE-RSA-DES-CBC3-SHA",
-                            "ECDHE-RSA-AES128-SHA",
-                            "ECDHE-RSA-AES256-SHA",
-
-                            "ECDHE-ECDSA-NULL-SHA",
-                            "ECDHE-ECDSA-RC4-SHA",
-                            "ECDHE-ECDSA-DES-CBC3-SHA",
-                            "ECDHE-ECDSA-AES128-SHA",
-                            "ECDHE-ECDSA-AES256-SHA"}
-
-var fixedECDHCiphers = []string{"ECDH-RSA-NULL-SHA",
-                                "ECDH-RSA-RC4-SHA",
-                                "ECDH-RSA-DES-CBC3-SHA",
-                                "ECDH-RSA-AES128-SHA",
-                                "ECDH-RSA-AES256-SHA",
-
-                                "ECDH-ECDSA-NULL-SHA",
-                                "ECDH-ECDSA-RC4-SHA",
-                                "ECDH-ECDSA-DES-CBC3-SHA",
-                                "ECDH-ECDSA-AES128-SHA",
-                                "ECDH-ECDSA-AES256-SHA"}
-
-func concatenateCiphers (ciphers []string) (string) {
-  var joinedCiphers string
-  for index, cipher := range ciphers {
-    if index != 0 {
-      joinedCiphers += ":"
-    }
-    joinedCiphers += cipher
-  }
-  return joinedCiphers
-}
-
-  type sslCheckOptions struct {
+type sslCheckOptions struct {
   host string
   port int
+  hostTicker *time.Ticker
+  globalTicker *time.Ticker
+  result ScanResult
 }
 
-func testConnection() {
-
+func (o sslCheckOptions) rateLimit () {
+  <-o.hostTicker.C
+  <-o.globalTicker.C
 }
 
-
-func (s sslCheckOptions) testProtocolCipher (cipherName string) (int){
+func (o sslCheckOptions) testProtocolCipher (cipherName string) (string, error) {
   // fmt.Println("trying", s.host, cipherName)
+
+  var handshake handShakeResult
 
   const request = "GET / HTTP/1.0\r\nUser-Agent: SSLScan\r\nHost: %s\r\n\r\n"
 
   //creates TLS context (SSL disabled by default)
   context, err := openssl.NewCtxWithVersion(openssl.TLSv1_2)
-  if err != nil {
-          log.Fatal(err)
-  }
+  check(err)
 
   err = context.SetCipherList ( cipherName )
-  if err != nil {
-    log.Fatal(err)
-  }
+  check(err)
 
-  conn, err:=s.testHost()
+  o.rateLimit()
+  conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
   if err != nil {
-    log.Print("Lost connection to Host: ", err)
-    return -1
+    o.appendError(blockedDoS, err)
+    return "", err
   }
 
   conn_ssl, err := openssl.Client(conn, context)
   check(err)
   err = conn_ssl.Handshake()  
-  //var dialer net.Dialer
-  //dialer.Timeout = time.Duration(30)*time.Second
 
-  //conn, err := openssl.Dial("tcp", s.host, context, 0)
   if err != nil {
     //inspect for weak dh key
     errorString := err.Error()
     //log.Println(errorString)
     if strings.Contains(errorString, "dh key too small") {
-      log.Print("dh key too small")
+      o.appendError(dhKeyTooSmall, err)
     }
     if strings.Contains(errorString, "no such host") {
-      log.Print("No such Host")
-      return -1
+      o.appendError(invalidHostname, err)
+      return "", err
     }
     if strings.Contains(errorString, "connection timed out") {
-      log.Print("Connection Timed Out")
-      return -1
+      o.appendError(timeout, err)
+      return "", err
     }
-    return 0
-    //fmt.Sprintf("%s rejected cipher %s", s.host, cipherName)
+    return "", nil
   }
-  defer conn_ssl  .Close()
+  defer conn_ssl.Close()
 
-  sslCipherName, err := conn_ssl.CurrentCipher()
-  if err != nil {
-    log.Fatal(err)
-  }
+  handshake.cipher, err = conn_ssl.CurrentCipher()
+  check(err)
 
   cert, err := conn_ssl.PeerCertificate()
-  if err != nil {
-    log.Fatal(err)
-  }
+  check(err)
+
   pkey, err := cert.PublicKey()
-  if err != nil {
-    log.Fatal(err)
-  }
+  check(err)
 
-  key_size := openssl.PKeySize(pkey)
-  fmt.Println("Encryption Key Size (bits): ", key_size*8)
+  //FIX: PKeySize assumes RSA authentication
+  handshake.authKeyBits = openssl.PKeySize(pkey) * 8
 
+  //fmt.Println("Encryption Key Size (bits): ", key_size*8)
 
   //fmt.Sprintf("%s accepted cipher %s", s.host, sslCipherName)
+  
   keyId, keyBits, curveName := conn_ssl.GetServerTmpKey()
-  fmt.Println(s.host, sslCipherName, keyId, keyBits, curveName)
-  return 0
+  handshake.keyExchangeID = keyId
+  handshake.keyExchangeBits = keyBits
+  handshake.ecdheCurve = curveName
+  fmt.Println(o.host, handshake.cipher, keyId, keyBits, curveName)
+  o.result.handshakes = append(o.result.handshakes, handshake)
+  return handshake.cipher, nil
 }
 
-func (s sslCheckOptions) testProtocolCiphers (globalLimiter  <-chan time.Time) {
+func (o sslCheckOptions) testProtocolCiphers () {  
 
-  var wg sync.WaitGroup
-  hostLimiter := time.Tick(time.Second)
-  result_ch := make(chan int)
-
-  wg.Add(1)
-  go func () {
-      defer wg.Done()
-      <-hostLimiter
-      <-globalLimiter
-      result_ch <- s.testProtocolCipher(concatenateCiphers(rsaCiphers))
-  }()
-  if(<-result_ch < 0){
-    fmt.Println(s.host, "Done")
+  //"RSA is an alias for kRSA" per 1.1.0 doc 
+  //(wrongly described in 1.0.2 doc as RSA for either key exchange
+  //or authentication)
+  cipher, err := o.testProtocolCipher("kRSA")
+  if err != nil {
+    fmt.Println("Early fail on host ", o.host)
     return
   }
-  wg.Add(1)
-  go func () {
-    defer wg.Done()
-    <-hostLimiter
-    <-globalLimiter
-    result_ch <- s.testProtocolCipher(concatenateCiphers(ecdheCiphers))
-  }()
-  if(<-result_ch < 0){
-    fmt.Println(s.host, "Done")
-    return
+  if cipher != "" {
+    o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, rsaKeyExch)
   }
 
-  for _, cipher := range dhCiphers {
-    wg.Add(1)
-    go func () {
-      defer wg.Done()
-      <-hostLimiter
-      <-globalLimiter
-      result_ch <- s.testProtocolCipher(cipher)
-    }()
-    if(<-result_ch < 0){
-     fmt.Println(s.host, "Done")
-     return
+  //check for ECDHE key exchange support, deliberately eliminating anonmyous (kECDHE)
+  cipher, err = o.testProtocolCipher("ECDHE")
+  if err != nil {
+    fmt.Println("Early fail on host ", o.host)
+    return
+  }
+  if cipher != ""  {
+    o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, ecdhe)
+  }
+
+  //check for anonymous ECDHE
+  cipher, err = o.testProtocolCipher("aECDHE")
+  if err != nil {
+    fmt.Println("Early fail on host ", o.host)
+    return
+  }
+  if cipher != ""  {
+    o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, anonECDHE)
+  }
+
+  //check for fixed ECDH
+  cipher, err = o.testProtocolCipher("kECDH")
+  if err != nil {
+    fmt.Println("Early fail on host ", o.host)
+    return
+  }
+  if cipher != "" {
+    o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, fixedECDH)
+  }
+
+  //loop over DHE ciphers, including anonymous
+  dheCipher := "kDHE"
+
+  for true {
+    cipher, _ = o.testProtocolCipher(dheCipher)
+    if cipher != "" {
+      dheCipher += ":" + cipher
+    }else{
+      break;
     }
   }
 
-  for _, cipher := range dheCiphers {
-     wg.Add(1)
-    go func () {
-      defer wg.Done()
-      <-hostLimiter
-      <-globalLimiter
-      result_ch <- s.testProtocolCipher(cipher)
-    }()
-    if(<-result_ch < 0){
-      fmt.Println(s.host, "Done")
+  fmt.Println(o.host, "Done")
+
+  return
+}
+
+func (o sslCheckOptions) appendError (cE connectionError, e error) {
+  o.result.error = append(o.result.error, cE)
+  o.result.comments += e.Error() + "\n"
+}
+
+func (o sslCheckOptions) scanHost() {
+  o.hostTicker = time.NewTicker(time.Second)
+
+  //initial TCP connection to 443 port
+  o.rateLimit()
+  conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
+  if err != nil {
+    //TODO : fine-grain error check
+    log.Print("Error in connection start to host", o.host, err)
+    o.appendError(connectionRefused, err)
+    if strings.HasPrefix(o.host, "www") {
+      return
+    }
+
+    log.Print("Trying www prefix for host", o.host)
+    o.host = "www." + o.host
+
+    o.rateLimit()
+    conn, err = net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
+    if err != nil {
+      log.Print("Could not connect to host", o.host, err)
+      o.appendError(connectionRefused, err)
       return
     }
   }
-
-  wg.Wait()
-  fmt.Println(s.host, "Done")
-}
-
-func (o sslCheckOptions) testHost() (net.Conn, error) {
-
-  conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
-  if err != nil {
-    return nil, err
-  }
-  return conn, nil
-}
-
-func scanHost(hostName string, globalLimiter <-chan time.Time) {
-  log.Println("scanHost" , hostName)
-
-  options := sslCheckOptions{ hostName, 443}
-  conn, err:=options.testHost();
-  if err != nil {
-    log.Print("Error in connection Start ", err)
-    return
-  }
   conn.Close()
-  options.testProtocolCiphers(globalLimiter)
 
+  o.testProtocolCiphers()
 }
