@@ -126,8 +126,10 @@ func (o sslCheckOptions) testProtocolCiphers () {
     o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, ecdhe)
   }
 
-  //check for anonymous ECDHE
-  cipher, err = o.testProtocolCipher("aECDHE")
+
+
+  //check for anonymous ECDH
+  cipher, err = o.testProtocolCipher("aECDH")
   if err != nil {
     fmt.Println("Early fail on host ", o.host)
     return
