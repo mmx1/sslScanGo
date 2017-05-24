@@ -152,9 +152,10 @@ func (o sslCheckOptions) testProtocolCiphers () {
   dheCipher := "kDHE"
 
   for true {
+    //fmt.Print(dheCipher)
     cipher, _ = o.testProtocolCipher(dheCipher)
     if cipher != "" {
-      dheCipher += ":" + cipher
+      dheCipher += ":!" + cipher
     }else{
       break;
     }
