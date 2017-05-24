@@ -2,14 +2,15 @@ package main
 
 import (
   "encoding/json"
+  // "fmt"
   "os"
   "strconv"
   "time"
 )
 
-type connectionError int
+type ConnectionError int
 const (
-  connectionRefused connectionError = iota // == 0
+  connectionRefused ConnectionError = iota // == 0
   sslError // == 1
   timeout
   invalidHostname
@@ -20,42 +21,42 @@ const (
   other
 )
 
-type keyExchangeMethod int
+type KeyExchangeMethod int
 const (
-  rsaKeyExch keyExchangeMethod = iota
+  rsaKeyExch KeyExchangeMethod = iota
   dhe
   ecdhe
   fixedECDH
   anonECDHE
 )
 
-type authMethod int
+type AuthMethod int
 const (
-  rsaAuth authMethod = iota
+  rsaAuth AuthMethod = iota
   anonymous
   dsa
   ecdsa
   ecdh
 )
 
-type handShakeResult struct {
-  cipher string
-  keyExchangeID int
-  keyExchangeBits int
-  ecdheCurve string //don't hard-code curve names and ask directly from OpenSSL
-  authKeyBits int
+type HandShakeResult struct {
+  Cipher string
+  KeyExchangeID int
+  KeyExchangeBits int
+  EcdheCurve string //don't hard-code curve names and ask directly from OpenSSL
+  AuthKeyBits int
 }
 
 type ScanResult struct{
-  id int
-  error []connectionError
+  Id int
+  Error []ConnectionError
   //golang doesn't have option sets (bitmasks). So....array of ints
-  keyExchangeMethods []keyExchangeMethod
-  authMethods []authMethod
+  KeyExchangeMethods []KeyExchangeMethod
+  AuthMethods []AuthMethod
 
-  handshakes []handShakeResult
-  timestamp time.Time
-  comments string //drop exceptions in here to filter later
+  Handshakes []HandShakeResult
+  Timestamp time.Time
+  Comments string //drop exceptions in here to filter later
 }
 
 func exists(path string) (bool, error) {
@@ -66,7 +67,9 @@ func exists(path string) (bool, error) {
 }
 
 var dataDir = "./data/"
-func (o sslCheckOptions) print(fileName string) {
+func (o *sslCheckOptions) print(fileName string) {
+
+
 
   //write data dir if not exists
   if _, err:= os.Stat(dataDir); err != nil {
@@ -82,9 +85,14 @@ func (o sslCheckOptions) print(fileName string) {
     fileName += "." + strconv.Itoa( int(time.Now().Unix() ))
   }
 
+  
   outputFile, err := os.Create(fileName)
   check(err)
   defer outputFile.Close()
+
+  // fmt.Println(o.result)
+  // jsonObj, err := json.Marshal(o.result)
+  // fmt.Println(string(jsonObj[:]), err)
 
   encoder := json.NewEncoder(outputFile)
   err = encoder.Encode(&o.result)

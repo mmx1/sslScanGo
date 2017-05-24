@@ -33,10 +33,10 @@ func (o sslCheckOptions) rateLimit () {
   <-o.globalTicker.C
 }
 
-func (o sslCheckOptions) testProtocolCipher (cipherName string) (string, error) {
+func (o *sslCheckOptions) testProtocolCipher (cipherName string) (string, error) {
   // fmt.Println("trying", s.host, cipherName)
 
-  var handshake handShakeResult
+  var handshake HandShakeResult
 
   const request = "GET / HTTP/1.0\r\nUser-Agent: SSLScan\r\nHost: %s\r\n\r\n"
 
@@ -77,7 +77,7 @@ func (o sslCheckOptions) testProtocolCipher (cipherName string) (string, error) 
   }
   defer conn_ssl.Close()
 
-  handshake.cipher, err = conn_ssl.CurrentCipher()
+  handshake.Cipher, err = conn_ssl.CurrentCipher()
   check(err)
 
   cert, err := conn_ssl.PeerCertificate()
@@ -87,22 +87,23 @@ func (o sslCheckOptions) testProtocolCipher (cipherName string) (string, error) 
   check(err)
 
   //FIX: PKeySize assumes RSA authentication
-  handshake.authKeyBits = openssl.PKeySize(pkey) * 8
+  handshake.AuthKeyBits = openssl.PKeySize(pkey) * 8
 
   //fmt.Println("Encryption Key Size (bits): ", key_size*8)
 
   //fmt.Sprintf("%s accepted cipher %s", s.host, sslCipherName)
   
   keyId, keyBits, curveName := conn_ssl.GetServerTmpKey()
-  handshake.keyExchangeID = keyId
-  handshake.keyExchangeBits = keyBits
-  handshake.ecdheCurve = curveName
-  fmt.Println(o.host, handshake.cipher, keyId, keyBits, curveName)
-  o.result.handshakes = append(o.result.handshakes, handshake)
-  return handshake.cipher, nil
+  handshake.KeyExchangeID = keyId
+  handshake.KeyExchangeBits = keyBits
+  handshake.EcdheCurve = curveName
+  //fmt.Println(o.host, handshake.cipher, keyId, keyBits, curveName)
+  fmt.Println(o.host, handshake.Cipher, handshake)
+  o.result.Handshakes = append(o.result.Handshakes, handshake)
+  return handshake.Cipher, nil
 }
 
-func (o sslCheckOptions) testProtocolCiphers () {  
+func (o *sslCheckOptions) testProtocolCiphers () {  
 
   //"RSA is an alias for kRSA" per 1.1.0 doc 
   //(wrongly described in 1.0.2 doc as RSA for either key exchange
@@ -113,7 +114,7 @@ func (o sslCheckOptions) testProtocolCiphers () {
     return
   }
   if cipher != "" {
-    o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, rsaKeyExch)
+    o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, rsaKeyExch)
   }
 
   //check for ECDHE key exchange support, deliberately eliminating anonmyous (kECDHE)
@@ -123,7 +124,7 @@ func (o sslCheckOptions) testProtocolCiphers () {
     return
   }
   if cipher != ""  {
-    o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, ecdhe)
+    o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, ecdhe)
   }
 
 
@@ -135,7 +136,7 @@ func (o sslCheckOptions) testProtocolCiphers () {
     return
   }
   if cipher != ""  {
-    o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, anonECDHE)
+    o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, anonECDHE)
   }
 
   //check for fixed ECDH
@@ -145,7 +146,7 @@ func (o sslCheckOptions) testProtocolCiphers () {
     return
   }
   if cipher != "" {
-    o.result.keyExchangeMethods = append(o.result.keyExchangeMethods, fixedECDH)
+    o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, fixedECDH)
   }
 
   //loop over DHE ciphers, including anonymous
@@ -166,12 +167,12 @@ func (o sslCheckOptions) testProtocolCiphers () {
   return
 }
 
-func (o sslCheckOptions) appendError (cE connectionError, e error) {
-  o.result.error = append(o.result.error, cE)
-  o.result.comments += e.Error() + "\n"
+func (o *sslCheckOptions) appendError (cE ConnectionError, e error) {
+  o.result.Error = append(o.result.Error, cE)
+  o.result.Comments += e.Error() + "\n"
 }
 
-func (o sslCheckOptions) scanHost() {
+func (o *sslCheckOptions) scanHost() {
   o.hostTicker = time.NewTicker(time.Second)
 
   //initial TCP connection to 443 port

@@ -57,19 +57,19 @@ func main() {
       break
     }
 
-    fmt.Println(tokens[1])
     wg.Add(1)
     go func(lineNumber int, host string) {
       defer wg.Done()
       options := sslCheckOptions{ host: host + ":443", 
                                   port: 443,
-                                  result: ScanResult{id:lineNumber,
-                                                     timestamp: time.Now() } ,
+                                  result: ScanResult{Id:lineNumber,
+                                                     Timestamp: time.Now() } ,
                                   hostTicker: time.NewTicker(time.Second),
                                   globalTicker: globalLimiter,
                                 }
       options.scanHost()
       options.hostTicker.Stop()
+      fmt.Println("main", host, options.result)
       options.print(strconv.Itoa(lineNumber))
     } (lineNumber, tokens[1])
 
