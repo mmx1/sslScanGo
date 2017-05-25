@@ -69,7 +69,7 @@ func main() {
                                 }
       options.scanHost()
       options.hostTicker.Stop()
-      fmt.Println("main", host, options.result)
+      //fmt.Println("main", host, options.result)
       options.print(strconv.Itoa(lineNumber))
     } (lineNumber, tokens[1])
 

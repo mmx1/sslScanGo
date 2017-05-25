@@ -21,38 +21,38 @@ const (
   other
 )
 
-type KeyExchangeMethod int
+type KeyExchangeMethod int8
 const (
-  rsaKeyExch KeyExchangeMethod = iota
-  dhe
-  ecdhe
-  fixedECDH
-  anonECDHE
+  rsaKeyExch KeyExchangeMethod = 1 << iota
+  dhe //2
+  ecdhe //4
+  fixedECDH //8
 )
 
-type AuthMethod int
+type AuthMethod int8
 const (
-  rsaAuth AuthMethod = iota
+  rsaAuth AuthMethod = 1 << iota
   anonymous
   dsa
-  ecdsa
-  ecdh
+  ec
 )
 
 type HandShakeResult struct {
   Cipher string
   KeyExchangeID int
   KeyExchangeBits int
-  EcdheCurve string //don't hard-code curve names and ask directly from OpenSSL
+  KeyExchangeCurve string //don't hard-code curve names and ask directly from OpenSSL
+  AuthKeyId int
   AuthKeyBits int
+  AuthKeyCurve string
 }
 
 type ScanResult struct{
   Id int
   Error []ConnectionError
   //golang doesn't have option sets (bitmasks). So....array of ints
-  KeyExchangeMethods []KeyExchangeMethod
-  AuthMethods []AuthMethod
+  KeyExchangeMethods KeyExchangeMethod
+  AuthMethods AuthMethod
 
   Handshakes []HandShakeResult
   Timestamp time.Time

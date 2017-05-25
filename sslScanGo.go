@@ -13,6 +13,7 @@ import "C"
 
 import (
     "log"
+    "errors"
     "fmt"
     "strings"
     "time"
@@ -79,28 +80,81 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string) (string, error)
 
   handshake.Cipher, err = conn_ssl.CurrentCipher()
   check(err)
+  fmt.Printf("%s cipher: %s\n", o.host, handshake.Cipher)
+
+  tmpKeyId, tmpKeyBits, tmpKeyCurveName := conn_ssl.GetServerTmpKey()
+  handshake.KeyExchangeID = tmpKeyId
+  handshake.KeyExchangeBits = tmpKeyBits
+  handshake.KeyExchangeCurve = tmpKeyCurveName
+
+  fmt.Printf("Tmp key: 0x%x, %d, %s\n",  tmpKeyId, tmpKeyBits, tmpKeyCurveName)
+    switch tmpKeyId {
+    case int(C.EVP_PKEY_DH):
+      o.result.KeyExchangeMethods ^= dhe
+    case int(C.EVP_PKEY_EC):
+      o.result.KeyExchangeMethods ^= ecdhe
+    }
+  //todo: check for fixed DH
 
   cert, err := conn_ssl.PeerCertificate()
   check(err)
-
   pkey, err := cert.PublicKey()
-  check(err)
 
-  //FIX: PKeySize assumes RSA authentication
-  handshake.AuthKeyBits = openssl.PKeySize(pkey) * 8
+  if pkey == nil { // no key found, must be anonymous
+    o.result.AuthMethods ^= anonymous
+    if tmpKeyId == 0 {
+      noCipherError := errors.New("No Public Key or Server Tmp Key found")
+      o.appendError(other, noCipherError)
+    }
 
-  //fmt.Println("Encryption Key Size (bits): ", key_size*8)
+  }else{
+    certKeyId, certKeyBits, certCurveName := openssl.GetPKeyParameters(pkey)
+    fmt.Printf("Cert 0x%x, %d, %s\n",  certKeyId, certKeyBits, certCurveName)
+    switch certKeyId {
+    case int(C.EVP_PKEY_RSA):
+      o.result.AuthMethods ^= rsaAuth
+    case int(C.EVP_PKEY_DSA):
+      o.result.AuthMethods ^= dsa
+    case int(C.EVP_PKEY_EC):
+      o.result.AuthMethods ^= ec
+    }
 
-  //fmt.Sprintf("%s accepted cipher %s", s.host, sslCipherName)
-  
-  keyId, keyBits, curveName := conn_ssl.GetServerTmpKey()
-  handshake.KeyExchangeID = keyId
-  handshake.KeyExchangeBits = keyBits
-  handshake.EcdheCurve = curveName
-  //fmt.Println(o.host, handshake.cipher, keyId, keyBits, curveName)
-  fmt.Println(o.host, handshake.Cipher, handshake)
+    handshake.AuthKeyId = certKeyId
+    handshake.AuthKeyBits = certKeyBits
+    handshake.AuthKeyCurve = certCurveName
+
+    if tmpKeyId == 0 {
+      o.result.KeyExchangeMethods ^= rsaKeyExch
+      handshake.KeyExchangeID = tmpKeyId
+      handshake.KeyExchangeBits = tmpKeyBits
+      handshake.KeyExchangeCurve = tmpKeyCurveName
+
+    }
+  }
+
   o.result.Handshakes = append(o.result.Handshakes, handshake)
   return handshake.Cipher, nil
+
+  //FIX: PKeySize assumes RSA authentication
+  // pkeySize = openssl.PKeySize(pkey) * 8
+
+  // //fmt.Println("Encryption Key Size (bits): ", key_size*8)
+
+  // //fmt.Sprintf("%s accepted cipher %s", s.host, sslCipherName)
+  
+  // keyId, keyBits, curveName := conn_ssl.GetServerTmpKey()
+  // switch  {
+  // case keyId & 0x01 != 0 : //EVP_PK_RSA
+
+  // //case 0x02 : //EVP_PK:DSA
+  // case keyId & 0x04 != 0: 
+  // }
+
+  // handshake.KeyExchangeID = keyId
+  // handshake.KeyExchangeBits = keyBits
+  // handshake.EcdheCurve = curveName
+  
+  
 }
 
 func (o *sslCheckOptions) testProtocolCiphers () {  
@@ -108,53 +162,53 @@ func (o *sslCheckOptions) testProtocolCiphers () {
   //"RSA is an alias for kRSA" per 1.1.0 doc 
   //(wrongly described in 1.0.2 doc as RSA for either key exchange
   //or authentication)
-  cipher, err := o.testProtocolCipher("kRSA")
-  if err != nil {
-    fmt.Println("Early fail on host ", o.host)
-    return
-  }
-  if cipher != "" {
-    o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, rsaKeyExch)
-  }
+  // cipher, err := o.testProtocolCipher("kRSA")
+  // if err != nil {
+  //   fmt.Println("Early fail on host ", o.host)
+  //   return
+  // }
+  // if cipher != "" {
+  //   o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, rsaKeyExch)
+  // }
 
   //check for ECDHE key exchange support, deliberately eliminating anonmyous (kECDHE)
-  cipher, err = o.testProtocolCipher("ECDHE")
-  if err != nil {
-    fmt.Println("Early fail on host ", o.host)
-    return
-  }
-  if cipher != ""  {
-    o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, ecdhe)
-  }
+  // cipher, err = o.testProtocolCipher("ECDHE")
+  // if err != nil {
+  //   fmt.Println("Early fail on host ", o.host)
+  //   return
+  // }
+  // if cipher != ""  {
+  //   o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, ecdhe)
+  // }
 
 
 
   //check for anonymous ECDH
-  cipher, err = o.testProtocolCipher("aECDH")
-  if err != nil {
-    fmt.Println("Early fail on host ", o.host)
-    return
-  }
-  if cipher != ""  {
-    o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, anonECDHE)
-  }
+  // cipher, err = o.testProtocolCipher("aECDH")
+  // if err != nil {
+  //   fmt.Println("Early fail on host ", o.host)
+  //   return
+  // }
+  // if cipher != ""  {
+  //   o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, anonECDHE)
+  // }
 
   //check for fixed ECDH
-  cipher, err = o.testProtocolCipher("kECDH")
-  if err != nil {
-    fmt.Println("Early fail on host ", o.host)
-    return
-  }
-  if cipher != "" {
-    o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, fixedECDH)
-  }
+  // cipher, err = o.testProtocolCipher("kECDH")
+  // if err != nil {
+  //   fmt.Println("Early fail on host ", o.host)
+  //   return
+  // }
+  // if cipher != "" {
+  //   o.result.KeyExchangeMethods = append(o.result.KeyExchangeMethods, fixedECDH)
+  // }
 
   //loop over DHE ciphers, including anonymous
-  dheCipher := "kDHE"
+  dheCipher := "ALL:COMPLEMENTOFALL"
 
   for true {
     //fmt.Print(dheCipher)
-    cipher, _ = o.testProtocolCipher(dheCipher)
+    cipher, _ := o.testProtocolCipher(dheCipher)
     if cipher != "" {
       dheCipher += ":!" + cipher
     }else{
