@@ -1,5 +1,6 @@
 #!/bin/bash
 rm -f $GOPATH/bin/sslScanGo
+rm -f $GOPATH/src/github.com/mmx1/sslScanGo/data/*
 go get github.com/mmx1/sslScanGo && go install github.com/mmx1/sslScanGo
 #read -p 'Enter File name ' filename
 #read -p 'Starting Index ' startInd
@@ -14,8 +15,8 @@ if [ $1 ]; then
 	filename=$1
 else
 	filename=bad.csv
-	startInd=0
-	endInd=4
+	startInd=2
+	endInd=2
 fi
 if [ $2 ]; then
 	startInd=$2

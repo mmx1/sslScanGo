@@ -244,8 +244,8 @@ func (s sslCheckOptions) testProtocolCiphers (globalLimiter  <-chan time.Time) {
   fmt.Println(s.host, "Done")
 }
 
-func (o sslCheckOptions) testHost() (net.Conn, error) {
 
+func (o sslCheckOptions) testHost() (net.Conn, error) {
   conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
   if err != nil {
     return nil, err
