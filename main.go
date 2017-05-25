@@ -9,8 +9,11 @@ import (
   "strconv"
   "strings"
   "sync"
+  "sync/atomic"
   "time"
 )
+
+var numProcesses = 300
 
 func check(e error) {
     if e != nil {
@@ -39,6 +42,15 @@ func main() {
   //messages := make(chan int)
   var wg sync.WaitGroup
 
+
+  processes := make(chan int, numProcesses)
+  for i := 0; i < numProcesses; i++ {
+    processes <- 1
+  }
+
+  var done uint32 = 0
+  var total = *endPtr - *startPtr + 1
+
   scanner := bufio.NewScanner(f)
   for scanner.Scan() {
     tokens := strings.Split(scanner.Text(), ",")
@@ -57,9 +69,16 @@ func main() {
       break
     }
 
+    <- processes
     wg.Add(1)
     go func(lineNumber int, host string) {
-      defer wg.Done()
+      
+      defer func () {
+        processes <- 1
+        wg.Done()
+        v := atomic.AddUint32(&done, 1)
+        fmt.Printf("Done with host %s, %d of %d \n", host, v, total )
+      } ()
       options := sslCheckOptions{ host: host + ":443", 
                                   port: 443,
                                   result: ScanResult{Id:lineNumber,

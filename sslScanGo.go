@@ -14,7 +14,7 @@ import "C"
 import (
     "log"
     "errors"
-    "fmt"
+    // "fmt"
     "strings"
     "time"
     "net" 
@@ -150,7 +150,7 @@ func (o *sslCheckOptions) testProtocolCiphers () {
     }
   }
 
-  fmt.Println(o.host, "Done")
+  //fmt.Println(o.host, "Done")
 
   return
 }
@@ -184,19 +184,19 @@ func (o *sslCheckOptions) scanHost() {
   conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
   if err != nil {
     //TODO : fine-grain error check
-    log.Print("Error in connection start to host", o.host, err)
+    log.Println("Error in connection start to host ", o.host, err)
     o.appendError(connectionRefused, err)
     if strings.HasPrefix(o.host, "www") {
       return
     }
 
-    log.Print("Trying www prefix for host", o.host)
+    log.Println("Trying www prefix for host", o.host)
     o.host = "www." + o.host
 
     o.rateLimit()
     conn, err = net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
     if err != nil {
-      log.Print("Could not connect to host", o.host, err)
+      log.Println("Could not connect to host", o.host, err)
       o.appendError(connectionRefused, err)
       return
     }
