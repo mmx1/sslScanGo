@@ -18,6 +18,7 @@ const (
   ipUnreacheable
   blockedDoS
   dhKeyTooSmall
+  dhRSAmismatch
   other
 )
 
@@ -74,7 +75,7 @@ func (o *sslCheckOptions) print(fileName string) {
   //write data dir if not exists
   if _, err:= os.Stat(dataDir); err != nil {
     if os.IsNotExist(err) {
-      err = os.Mkdir(dataDir, os.ModeDir)
+      err = os.Mkdir(dataDir, os.ModeDir | os.ModePerm)
     }
     check(err)
   }
