@@ -70,6 +70,7 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string) (string, error)
     if strings.Contains(errorString, "connection timed out") {
       o.appendError(timeout, err)
     }
+    o.appendError(sslError, err)
     return "", err
   }
   defer conn.Close()
