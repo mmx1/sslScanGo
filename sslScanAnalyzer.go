@@ -174,7 +174,17 @@ func main () {
                         (result.AuthMethods & 8) != 0,
                         result.Comments )
 
+    for _, handshake := range result.Handshakes {
+      _, err = insertHandshakeStmt.Exec ( result.Id,
+                                          handshake.Cipher,
+                                          handshake.KeyExchangeID,
+                                          handshake.KeyExchangeBits,
+                                          handshake.KeyExchangeCurve,
+                                          handshake.AuthKeyId,
+                                          handshake.AuthKeyBits,
+                                          handshake.AuthKeyCurve )
 
+    }
     //
 
   }
