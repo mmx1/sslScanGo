@@ -6,3 +6,5 @@ go get github.com/mmx1/sslScanAnalyzer && go install github.com/mmx1/sslScanAnal
 #read -p 'Ending Index ' endInd
 
 $GOPATH/bin/sslScanAnalyzer
+go build dbHelper/queryDB.go
+./queryDB

@@ -3,14 +3,14 @@ package main
 import (
   "encoding/json"
   "database/sql"
-  // "fmt"
+  //"fmt"
   _ "github.com/mattn/go-sqlite3"
   "io/ioutil"
   "log"
   "os"
   "time"
-  "strconv"
-  "runtime"
+  //"strconv"
+  //"runtime"
 )
 
 type ConnectionError int
@@ -149,7 +149,6 @@ func main () {
 
   files, err := ioutil.ReadDir(dataDir)
   check(err)
-  
   done := make(chan int, len(files))
   var nW int
   if len(files) < 20 {
@@ -158,6 +157,8 @@ func main () {
     nW = 20
   }
   worker := make (chan int, nW)
+  dbLock := make(chan int, 1)
+  dbLock <- 1
   for i := 0; i < 20; i ++ {
     worker <- 1
   } 
@@ -166,12 +167,14 @@ func main () {
       log.Println("**** FOUND CURRENT DIR *****")
     }
     
+    //create function when worker is present
     <-worker
     go func(f os.FileInfo){
       
       defer func(){
         worker <- 1
         done <- 1
+        dbLock <- 1
       }()
 
       log.Println(dataDir + f.Name())
@@ -200,25 +203,26 @@ func main () {
       }
 
       // For Concurrency Need A transaction for adding to the database
+      <-dbLock
       tx, err := db.Begin()
       if err != nil {
         //log.Println("here begin1")
       }
       check(err) 
       insertHostStmt, err := tx.Prepare("insert into hosts (id, errors, keyExRSA, keyExDHE, keyExECDHE, authRSA, authAnon, authDSA, authEC, comments) VALUES( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )")
-      counter := 0
+      //counter := 0
       // GETTING A 'DATABASE IS LOCKED' ERROR 
       // THIS MEANS THAT "LIKELY" the thread holding the lock on the database was removed by the 
       // scheduler...
-      for err != nil {
-        if counter >= 1000 {
-          break
-        }
-        runtime.Gosched()
-        time.Sleep(100 * time.Millisecond)
-        insertHostStmt, err = tx.Prepare("insert into hosts (id, errors, keyExRSA, keyExDHE, keyExECDHE, authRSA, authAnon, authDSA, authEC, comments) VALUES( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )")
-        counter++
-      }
+      // for err != nil {
+      //   if counter >= 1000 {
+      //     break
+      //   }
+      //   runtime.Gosched()
+      //   time.Sleep(100 * time.Millisecond)
+      //   insertHostStmt, err = tx.Prepare("insert into hosts (id, errors, keyExRSA, keyExDHE, keyExECDHE, authRSA, authAnon, authDSA, authEC, comments) VALUES( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )")
+      //   counter++
+      // }
       if err != nil {
         log.Println("here prep1")
       }
@@ -238,23 +242,23 @@ func main () {
                           result.Comments )
       // COMMITS THE TRANSACTION TO THE DATABASE (RELEASES THE DATABASE LOCK)
       // ALSO anything tied (state: i.e. insertHostStmt) to this transaction is deleted
-      err = tx.Commit()
-      counter = 0
-      for err != nil {
-        if counter >= 100 {
-          //log.Println("here commit1")
-          log.Fatal(err)
-        }
-        runtime.Gosched()
-        err = tx.Commit()
-        counter++
-      }
-      insertHostStmt.Close()
-      tx, err = db.Begin()
-      if err != nil {
-        //log.Println("here begin2")
-      }
-      check(err)
+      // err = tx.Commit()
+      // counter = 0
+      // for err != nil {
+      //   if counter >= 100 {
+      //     //log.Println("here commit1")
+      //     log.Fatal(err)
+      //   }
+      //   runtime.Gosched()
+      //   err = tx.Commit()
+      //   counter++
+      // }
+      // insertHostStmt.Close()
+      // tx, err = db.Begin()
+      // if err != nil {
+      //   //log.Println("here begin2")
+      // }
+      // check(err)
       insertHandshakeStmt, err := tx.Prepare("insert into handshakes (host, cipher, keyexid, keyexbits, keyexcurve, authid, authbits, authcurve ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?) ")
       if err != nil {
         //log.Println("here prep2")
@@ -270,20 +274,11 @@ func main () {
                                             handshake.AuthKeyId,
                                             handshake.AuthKeyBits,
                                             handshake.AuthKeyCurve )
+        check(err)
 
       }
       err = tx.Commit()
-      counter = 0
-      for err != nil {
-        if counter >= 100 {
-          //log.Println("here commit2")
-          log.Fatal(err)
-        }
-        runtime.Gosched()
-        err = tx.Commit()
-        counter++
-      }
-      //check(err)
+      check(err)
       insertHandshakeStmt.Close()
 
     }(f)
@@ -292,55 +287,5 @@ func main () {
   for i := 0; i < len(files); i++ {
     <-done
   }
-
-  // WE HAVE A CONCURRENCY PROBLEM: len(Files) != number of rows in the hosts directory 
   log.Println("Finished the insert of all files: ", len(files))
-
-  // Run Statistics Table ???
-  populateStatistics, err := db.Prepare("insert into stats (totRowCount, totKeyExRSA, totKeyExDHE, totKeyExECDHE , totAuthRSA, totAuthAnon, totAuthDSA, totAuthEC) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?) ")
-  check(err) 
-
-  rows, err := db.Query("select count(*) from hosts")
-  check(err)
-  var totalRowCount int64 
-  rows.Next()
-  err = rows.Scan(&totalRowCount) //returns []string
-  check(err)
-  log.Println("Total number of rows: ", totalRowCount)
-  rows.Close()
-  
-  //used to just get the column names 
-  rows, err = db.Query("select * from hosts where id=1")
-
-  statement := "select count(*) from hosts where "
-  columns, err := rows.Columns()
-  check(err)
-  log.Println("Columns are: ", columns)
-  var count []int64
-  for i, v := range columns {
-    if i >= 3 && i != len(columns)-1 {
-        rows1, err := db.Query(statement + v + "= 1")
-        check(err)
-        var val int64 
-        rows1.Next()
-        err = rows1.Scan(&val) //returns []string
-        check(err)
-        //log.Println("Total number of "+v+" :", val)
-        count = append(count, val)
-        rows1.Close()
-    }
-  }
-  log.Println(count)
-  //HARD CODED ... MESSY
-  _, err = populateStatistics.Exec(totalRowCount, count[0], count[1], count[2], count[3], count[4], count[5], count[6])
-  check(err)
-  tableIIFile, err := os.Create("TableII.txt")
-  _, err = tableIIFile.WriteString("METHOD\t\tHOST\n")
-  _, err = tableIIFile.WriteString("----------------------------\n")
-  percentage := float64(count[0])/float64(totalRowCount) * 100
-  _, err = tableIIFile.WriteString("RSA\t\t\t"+strconv.FormatInt(count[0],10)+" ("+strconv.FormatFloat(percentage, 'f', 1, 64)+"%)\n")
-  percentage = float64(count[1])/float64(totalRowCount) * 100
-  _, err = tableIIFile.WriteString("DHE\t\t\t"+strconv.FormatInt(count[1],10)+" ("+strconv.FormatFloat(percentage, 'f', 1, 64)+"%)\n")
-  percentage = float64(count[2])/float64(totalRowCount) * 100
-  _, err = tableIIFile.WriteString("ECDHE\t\t"+strconv.FormatInt(count[2],10)+" ("+strconv.FormatFloat(percentage, 'f', 1, 64)+"%)\n")
 }
