@@ -198,8 +198,12 @@ func main () {
 
       errorMask := 0
       //make into a bitmask
+      foundM := make (map[uint]bool)
       for _ , element := range result.Error {
-        errorMask += 1 << uint(element)
+        if !foundM[uint(element)]{
+          errorMask += 1 << uint(element)
+        }
+        foundM[uint(element)]=true
       }
 
       // For Concurrency Need A transaction for adding to the database
