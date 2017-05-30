@@ -159,7 +159,7 @@ func main () {
   worker := make (chan int, nW)
   dbLock := make(chan int, 1)
   dbLock <- 1
-  for i := 0; i < 20; i ++ {
+  for i := 0; i < nW; i ++ {
     worker <- 1
   } 
   for _, f := range files {

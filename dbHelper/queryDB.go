@@ -182,7 +182,7 @@ func main () {
   }
 
   // Number of domains that allowed <1024 bits for DHE key exchange  
-  rows, err = db.Query("select count(errors) from hosts where errors & 128 = 1")
+  rows, err = db.Query("select count(errors) from hosts where errors & 128 = 128")
   check(err)
   var lowDHE int64 
   rows.Next()
