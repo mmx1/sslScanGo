@@ -60,13 +60,12 @@ func main () {
   defer db.Close()
 
   // TABLE II CODE
-  rows, err := db.Query("select count(*) from hosts")
+  rows, err := db.Query("select count(distinct host) from handshakes")
   check(err)
   var numEntries int64 
   rows.Next()
   err = rows.Scan(&numEntries) //returns []string
   check(err)
-  log.Println("Total number of rows: ", numEntries)
   rows.Close()
   
   //used to just get the list of Key Exchange messages (columns of a single row) 
