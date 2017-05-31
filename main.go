@@ -6,6 +6,7 @@ import (
   "fmt"
   "log"
   "os"
+  "math/rand"
   "strconv"
   "strings"
   "sync"
@@ -25,6 +26,7 @@ func main() {
 
   startPtr := flag.Int("start", 1, "start index")
   endPtr := flag.Int("end", 0, "end index")
+  randSelection := flag.Int("r", 0, "num Items to be randomly selected")
 
   flag.Parse()
   tail := flag.Args()
@@ -48,8 +50,29 @@ func main() {
     processes <- 1
   }
 
+
+
   var done uint32 = 0
   var total = *endPtr - *startPtr + 1
+
+  groupBreak := 0
+  groupCnt := 0
+  var rndGen *rand.Rand
+  var selected int
+  if *randSelection != 0 {
+    total = *randSelection
+    *startPtr = 1
+    *endPtr = 0
+    groupBreak = int(1000000 / *randSelection)
+    log.Println("Going to Randomly Select: ", *randSelection)
+    rndGen = rand.New(rand.NewSource(time.Now().Unix()))
+    randNum := rndGen.Float32()
+    log.Println("Random number is ", randNum)
+    log.Println("Group as float ", float32(groupBreak))
+    selected = int(randNum * float32(groupBreak))
+    log.Println("Groups of: ", groupBreak)
+    log.Println("going to select: ", selected)
+  }
 
   scanner := bufio.NewScanner(f)
   for scanner.Scan() {
@@ -67,6 +90,21 @@ func main() {
     }
     if lineNumber > *endPtr && *endPtr != 0 {
       break
+    }
+
+    if groupBreak != 0 {
+      log.Println("In random selection")
+      if groupCnt >= groupBreak {
+        groupCnt = 0
+        selected = int(rndGen.Float32() * float32(groupBreak))
+      }
+      if groupCnt != selected {
+        groupCnt++
+        continue
+      }
+      //fall through when groupCnt == selected
+      // i.e. choose a random number in each group
+      groupCnt++
     }
 
     <- processes
