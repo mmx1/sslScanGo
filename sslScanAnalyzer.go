@@ -193,8 +193,12 @@ func main () {
     check(err) 
     insertHostStmt, err := tx.Prepare("insert into hosts (id, errors, keyExRSA, keyExDHE, keyExECDHE, authRSA, authAnon, authDSA, authEC, comments) VALUES( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )")
     check(err)
+    defer insertHostStmt.Close()
+
     insertHandshakeStmt, err := tx.Prepare("insert into handshakes (host, cipher, keyexid, keyexbits, keyexcurve, authid, authbits, authcurve ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?) ")
     check(err)
+    defer insertHandshakeStmt.Close()
+
 
     //batch up to 10 results
     for i := 0 ; i < 10 ; i++ {
@@ -221,6 +225,7 @@ func main () {
                           (result.AuthMethods & 4) != 0,
                           (result.AuthMethods & 8) != 0,
                           result.Comments )
+        check(err)
 
         for _, handshake := range result.Handshakes {
           _, err = insertHandshakeStmt.Exec ( result.Id,
@@ -244,7 +249,7 @@ func main () {
       
     err = tx.Commit()
     check(err)
-    insertHandshakeStmt.Close()
+
 
   }
 
