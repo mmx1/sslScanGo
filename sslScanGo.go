@@ -34,7 +34,7 @@ func (o sslCheckOptions) rateLimit () {
   <-o.globalTicker.C
 }
 
-func (o *sslCheckOptions) testProtocolCipher (cipherName string) (string, error) {
+func (o *sslCheckOptions) testProtocolCipher (cipherName string, tlsVersion openssl.SSLVersion) (string, error) {
   // fmt.Println("trying", s.host, cipherName)
 
   var handshake HandShakeResult
@@ -42,8 +42,10 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string) (string, error)
   const request = "GET / HTTP/1.0\r\nUser-Agent: SSLScan\r\nHost: %s\r\n\r\n"
 
   //creates TLS context (SSL disabled by default)
-  context, err := openssl.NewCtxWithVersion(openssl.TLSv1_2)
+  log.Println(tlsVersion)
+  context, err := openssl.NewCtxWithVersion(tlsVersion)
   check(err)
+  log.Println("ssl good")
 
   err = context.SetCipherList ( cipherName )
   check(err)
@@ -136,16 +138,16 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string) (string, error)
   
 }
 
-func (o *sslCheckOptions) testProtocolCiphers () {  
+func (o *sslCheckOptions) testProtocolCiphers (tlsVersion openssl.SSLVersion) {  
 
   //loop over DHE ciphers, including anonymous
-  dheCipher := "ALL:COMPLEMENTOFALL"
+  cipherList := "ALL:COMPLEMENTOFALL"
 
   for true {
     //fmt.Print(dheCipher)
-    cipher, _ := o.testProtocolCipher(dheCipher)
+    cipher, _ := o.testProtocolCipher(cipherList, tlsVersion)
     if cipher != "" {
-      dheCipher += ":!" + cipher
+      cipherList += ":!" + cipher
     }else{
       break;
     }
@@ -177,7 +179,7 @@ func (o *sslCheckOptions) appendError (cE ConnectionError, e error) {
   }
 }
 
-func (o *sslCheckOptions) scanHost() {
+func (o *sslCheckOptions) scanHost(tlsVersions []openssl.SSLVersion) {
   o.hostTicker = time.NewTicker(time.Second)
 
   //initial TCP connection to 443 port
@@ -204,5 +206,7 @@ func (o *sslCheckOptions) scanHost() {
   }
   conn.Close()
 
-  o.testProtocolCiphers()
+  for _, version := range tlsVersions {
+    o.testProtocolCiphers(version)
+  }
 }

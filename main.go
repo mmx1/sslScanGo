@@ -12,6 +12,7 @@ import (
   "sync"
   "sync/atomic"
   "time"
+  "github.com/mmx1/opensslgo"
 )
 
 var numProcesses = 300
@@ -28,6 +29,7 @@ func main() {
   endPtr := flag.Int("end", 0, "end index")
   randSelection := flag.Int("r", -1, "num Items to be randomly selected")
   rerun := flag.String("rerun", "", "file of indices to rerun")
+  tlsVersionFlag := flag.String("tls", "all", "tls versions to run")
 
   var fileName = "top-1m.csv"
   flag.Parse()
@@ -37,6 +39,17 @@ func main() {
     fmt.Println("No file specified, defaulting to top-1m.csv")
   }else{
     fileName = tail[0]
+  }
+
+  var tlsVersions []openssl.SSLVersion
+  switch *tlsVersionFlag {
+  case "tls11":
+    tlsVersions = append(tlsVersions, openssl.TLSv1_1)
+  case "tls12":
+    tlsVersions = append(tlsVersions, openssl.TLSv1_2)
+  default:
+    tlsVersions = append(tlsVersions, openssl.TLSv1_2)
+    tlsVersions = append(tlsVersions, openssl.TLSv1_1)
   }
 
   var selectedIndices map[int]bool
@@ -137,7 +150,7 @@ func main() {
                                   hostTicker: time.NewTicker(time.Second),
                                   globalTicker: globalLimiter,
                                 }
-      options.scanHost()
+      options.scanHost(tlsVersions)
       options.hostTicker.Stop()
       //fmt.Println("main", host, options.result)
       options.print(strconv.Itoa(lineNumber))
