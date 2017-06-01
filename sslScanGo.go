@@ -42,10 +42,8 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string, tlsVersion open
   const request = "GET / HTTP/1.0\r\nUser-Agent: SSLScan\r\nHost: %s\r\n\r\n"
 
   //creates TLS context (SSL disabled by default)
-  log.Println(tlsVersion)
   context, err := openssl.NewCtxWithVersion(tlsVersion)
   check(err)
-  log.Println("ssl good")
 
   err = context.SetCipherList ( cipherName )
   check(err)
