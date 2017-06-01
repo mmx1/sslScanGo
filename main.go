@@ -26,17 +26,53 @@ func main() {
 
   startPtr := flag.Int("start", 1, "start index")
   endPtr := flag.Int("end", 0, "end index")
-  randSelection := flag.Int("r", 0, "num Items to be randomly selected")
+  randSelection := flag.Int("r", -1, "num Items to be randomly selected")
+  rerun := flag.String("rerun", "", "file of indices to rerun")
 
+  var fileName = "top-1m.csv"
   flag.Parse()
   tail := flag.Args()
   
   if len(tail) < 1 {
-    fmt.Println("Error, requires an filename argument")
-    return
+    fmt.Println("No file specified, defaulting to top-1m.csv")
+  }else{
+    fileName = tail[0]
   }
 
-  f, err := os.Open(tail[0])
+  var selectedIndices map[int]bool
+  if *randSelection > 0 {
+    fmt.Println(*randSelection, "random selected, ignoring other parameters")
+    selectedIndices = make(map[int]bool)
+    rndGen := rand.New(rand.NewSource(time.Now().Unix()))
+
+    for i := 0; i < *randSelection; i++ {
+      index := int(rndGen.Float32() * 1000 + 1)
+      fmt.Println("generated index", index)
+      if !selectedIndices[index] {
+        selectedIndices[index] = true
+      }else{
+        i-- //try again
+      }
+    }
+
+  }else if *rerun != "" {
+    fmt.Println("Rerunning indexes from", *rerun)
+    selectedIndices = make(map[int]bool)
+
+    f, err := os.Open(*rerun)
+    check(err)
+    defer f.Close()
+
+    scanner := bufio.NewScanner(f)
+    for scanner.Scan() {
+      index, err := strconv.Atoi(scanner.Text())
+      check(err)
+      selectedIndices[index] = true
+    }
+  }
+  var selectedTotal = len(selectedIndices)
+
+  f, err := os.Open(fileName)
   check(err)
   defer f.Close()
 
@@ -44,34 +80,17 @@ func main() {
   //messages := make(chan int)
   var wg sync.WaitGroup
 
-
   processes := make(chan int, numProcesses)
   for i := 0; i < numProcesses; i++ {
     processes <- 1
   }
 
-
-
   var done uint32 = 0
-  var total = *endPtr - *startPtr + 1
-
-  groupBreak := 0
-  groupCnt := 0
-  var rndGen *rand.Rand
-  var selected int
-  if *randSelection != 0 {
-    total = *randSelection
-    *startPtr = 1
-    *endPtr = 0
-    groupBreak = int(1000000 / *randSelection)
-    log.Println("Going to Randomly Select: ", *randSelection)
-    rndGen = rand.New(rand.NewSource(time.Now().Unix()))
-    randNum := rndGen.Float32()
-    log.Println("Random number is ", randNum)
-    log.Println("Group as float ", float32(groupBreak))
-    selected = int(randNum * float32(groupBreak))
-    log.Println("Groups of: ", groupBreak)
-    log.Println("going to select: ", selected)
+  var total int
+  if selectedIndices == nil {
+    total = *endPtr - *startPtr + 1
+  }else{
+    total = selectedTotal
   }
 
   scanner := bufio.NewScanner(f)
@@ -84,27 +103,21 @@ func main() {
 
     lineNumber, err := strconv.Atoi(tokens[0])
     check(err)
-    // fmt.Println(lineNumber)
-    if lineNumber < *startPtr {
-      continue
-    }
-    if lineNumber > *endPtr && *endPtr != 0 {
-      break
-    }
 
-    if groupBreak != 0 {
-      log.Println("In random selection")
-      if groupCnt >= groupBreak {
-        groupCnt = 0
-        selected = int(rndGen.Float32() * float32(groupBreak))
-      }
-      if groupCnt != selected {
-        groupCnt++
+    if selectedIndices == nil { //use start and end
+      if lineNumber < *startPtr {
         continue
       }
-      //fall through when groupCnt == selected
-      // i.e. choose a random number in each group
-      groupCnt++
+      if lineNumber > *endPtr && *endPtr != 0 {
+        break
+      }
+    }else{
+      if !selectedIndices[lineNumber] {
+        continue
+      }else{
+        selectedTotal--
+      }
+      // fmt.Println("Selected", lineNumber)
     }
 
     <- processes
@@ -129,6 +142,11 @@ func main() {
       //fmt.Println("main", host, options.result)
       options.print(strconv.Itoa(lineNumber))
     } (lineNumber, tokens[1])
+
+    //early end if using map
+    if selectedIndices == nil && selectedTotal == 0 {
+      break;
+    }
 
   }
 
