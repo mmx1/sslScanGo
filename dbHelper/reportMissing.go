@@ -23,12 +23,7 @@ func checkGaps(db *sql.DB) {
                    create table idseq (id integer not null primary key)`
   _, err := db.Exec(createTmpIds)
   check(err)
-
-  defer func () {
-      dropTmpIds := `drop table idseq`
-      _, err = db.Exec(dropTmpIds)
-      check(err)
-  }()
+  defer dropTable("idseq", db)
 
   dbLimit := make(chan int, 1)
   dbLimit <- 1
@@ -82,8 +77,51 @@ func checkGaps(db *sql.DB) {
 
 }
 
-func checkGaps(db *sql.DB) {
-  
+func dropTable(s string, db *sql.DB) {
+  dropTable := "drop table " + s
+  _, err := db.Exec(dropTable)
+  check(err)
+}
+
+func checkSSLErrorOnly(db *sql.DB) {
+  createSslHosts := `drop table if exists sslhosts;
+                   create table sslhosts as select distinct host from handshakes
+                   `
+  _, err := db.Exec(createSslHosts)
+  check(err)
+  defer dropTable("sslhosts", db)
+
+  createNoSSL := `drop table if exists nossl;
+                  create table nossl as 
+                        select h.id 
+                        from 
+                              hosts h 
+                              left join sslhosts s on h.id = s.host 
+                        where s.host is null
+                  `
+  _, err = db.Exec(createNoSSL)
+  check(err)
+  defer dropTable("nossl", db)
+
+  tlsFailQuery := `select * 
+                  from nossl s 
+                  where exists (select * 
+                                from hosts h 
+                                where h.id = s.id and h.errors & 2 = 2) `
+  tls12failrows, err := db.Query(tlsFailQuery)
+  check(err)
+
+  tlsFailFile, err := os.Create("tls12fail.txt")
+  check(err)
+  defer tlsFailFile.Close()
+
+  for tls12failrows.Next() {
+    var tlsFailId string
+    err = tls12failrows.Scan(&tlsFailId)
+    check(err)
+    //fmt.Println(missingId)
+    tlsFailFile.WriteString(tlsFailId + "\n")
+  }
 }
 
 func main () {
