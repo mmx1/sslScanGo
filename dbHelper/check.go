@@ -78,7 +78,7 @@ func checkGaps(db *sql.DB) {
 }
 
 func dropTable(s string, db *sql.DB) {
-  dropTable := "drop table " + s
+  dropTable := "drop table if exists " + s
   _, err := db.Exec(dropTable)
   check(err)
 }

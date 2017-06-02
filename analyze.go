@@ -9,6 +9,12 @@ import (
   "sort"
   "strconv"
   "strings"
+
+  "image/color"
+
+  "github.com/gonum/plot"
+  "github.com/gonum/plot/plotter"
+  "github.com/gonum/plot/vg"
 )
 
 func analyze(dbName string) {
@@ -16,11 +22,13 @@ func analyze(dbName string) {
   check(err)
   defer db.Close()
 
-  numTLSHosts := printTableI(db)
-  printTableII_V(db, numTLSHosts)
-  numDHEEnabled := printMainResult(db)
-  printTableIII(db, numDHEEnabled)
-  printTableIV(db)
+  // numTLSHosts := printTableI(db)
+  // printTableII_V(db, numTLSHosts)
+  // numDHEEnabled := printMainResult(db)
+  printMainGraph(db)
+  // printTableIII(db, numDHEEnabled)
+  // printTableIV(db)
+  // printTableVI(db)
 }
 
 func printTableI (db *sql.DB) (int) {
@@ -137,7 +145,7 @@ func printTableIII(db *sql.DB, numDHEEnabled int) {
   defer tableIIIFile.Close()
 
   _, err = tableIIIFile.WriteString("Diffie-Hellman parameter size support for DHE key exchange\n")
-  printTableFileHeader(tableIIIFile, 14, []string{"Size(bits)", "Hosts"})
+  printTableFileHeader(tableIIIFile, 14, []string{"Size(bits)", "Hosts", "HABJ'14"})
   lowDheStr := formatPercent(lowDHE, numDHEEnabled)
   printTableToFile(tableIIIFile, 14, []string{"≤768",lowDheStr, "97,494 (34.3%)" })
 
@@ -167,7 +175,6 @@ func prevDHSizeData (size int) (string) {
 }
 
 func printMainResult (db *sql.DB) (int) {
-
   numDHEQuery := "select count(distinct host) from handshakes where keyexid = 28"
   numDHEEnabled := singleIntQuery(numDHEQuery, db)
   log.Println("Total DHE enabled: ", numDHEEnabled)
@@ -201,6 +208,87 @@ func printMainResult (db *sql.DB) (int) {
   brFile.Close()
 
   return numDHEEnabled
+}
+
+func printMainGraph (db *sql.DB) {
+  dropTable("graph_output", db)
+  createTmpTableQuery := `create table graph_output as select * 
+                          from handshakes 
+                          where keyexid = 28 and authid = 6`
+  _, err := db.Exec(createTmpTableQuery)
+  check(err)
+  defer dropTable("graph_output", db)
+
+  keEquals := tupleQuery("keyexbits = authbits", db)
+  keyexless := tupleQuery("keyexbits < authbits", db)
+  keyexmore := tupleQuery("keyexbits > authbits", db)
+
+  p, err := plot.New()
+  check(err)
+  p.Title.Text = "Comparison of DH parameter size to RSA key strength"
+  p.X.Label.Text = "RSA key size (bits)"
+  p.Y.Label.Text = "DH parameter size (bits)"
+
+  bequals, err := plotter.NewBubbles(keEquals, vg.Points(3), vg.Points(20))
+  check(err)
+  bequals.Color = color.RGBA{R: 0, G:255, B: 0, A: 255}
+  p.Add(bequals)
+
+  beless, err := plotter.NewBubbles(keyexless, vg.Points(3), vg.Points(20))
+  check(err)
+  beless.Color = color.RGBA{R: 255, G:100, B: 0, A: 255}
+  p.Add(beless)
+
+  bemore, err := plotter.NewBubbles(keyexmore, vg.Points(3), vg.Points(20))
+  check(err)
+  bemore.Color = color.RGBA{R: 255, G:200, B: 0, A: 255}
+  p.Add(bemore)
+
+  err = p.Save(9*vg.Inch, 9*vg.Inch, "mainResult.png")
+  check(err)
+
+}
+
+func dropTable(s string, db *sql.DB) {
+  dropTable := "drop table if exists " + s
+  _, err := db.Exec(dropTable)
+  check(err)
+}
+
+type graphTuple struct{
+  count int
+  keyexbits int
+  authbits int 
+}
+
+type graphData []graphTuple
+
+// plotter.XYZer interface
+func (tuples graphData) Len() int {
+  return len(tuples)
+}
+
+func (tuples graphData) XYZ(i int) (float64, float64, float64) {
+  t := tuples[i]
+  return float64(t.authbits), float64(t. keyexbits), float64(t.count)
+}
+
+func tupleQuery(predicate string, db *sql.DB) graphData {
+  format := `select count(host), keyexbits, authbits 
+             from graph_output 
+             where %s group by keyexbits, authbits `
+  query := fmt.Sprintf(format, predicate)
+  rows, err := db.Query(query)
+  check(err)
+  defer rows.Close()
+  var result []graphTuple
+  for rows.Next() {
+    var tuple graphTuple
+    err = rows.Scan(&tuple.count, &tuple.keyexbits, &tuple.authbits)
+    check(err)
+    result = append(result, tuple)
+  }
+  return result
 }
 
 func printTableIV (db *sql.DB) {
@@ -243,8 +331,49 @@ func printTableIV (db *sql.DB) {
   check(err)
 }
 
-func printTableVI () {
+func printTableVI (db *sql.DB) {
+  numRSAAuth := singleIntQuery("select count (distinct host) from handshakes where authid = 6", db)
 
+  buckets := make(map[string]int) 
+  buckets["≤ 512"]       = singleIntQuery("select count (distinct host) from handshakes where authbits <= 512 and authid = 6", db)
+  buckets["513 - 1023"]  = singleIntQuery("select count (distinct host) from handshakes where authbits > 512 and authbits < 1024 and authid = 6", db)
+  buckets["1024"]        = singleIntQuery("select count (distinct host) from handshakes where authbits = 1024 and authid = 6", db)
+  buckets["1025 - 2047"] = singleIntQuery("select count (distinct host) from handshakes where authbits > 1024 and authbits < 2048 and authid = 6", db)
+  buckets["2048"]        = singleIntQuery("select count (distinct host) from handshakes where authbits = 2048 and authid = 6", db)
+  buckets["2049 - 4095"] = singleIntQuery("select count (distinct host) from handshakes where authbits > 2048 and authbits < 4096 and authid = 6", db)
+  buckets["4096"]        = singleIntQuery("select count (distinct host) from handshakes where authbits = 4096 and authid = 6", db)
+  buckets["≥ 4097"]      = singleIntQuery("select count (distinct host) from handshakes where authbits > 4096 and authid = 6", db)
+
+  //Create TableIV File and fill with data
+  tableVIFile, err := os.Create("TableVI.txt")
+  check(err)
+  defer tableVIFile.Close()
+
+  _, err = tableVIFile.WriteString("RSA key sizes of TLS server certificates\n")
+  printTableFileHeader(tableVIFile, 15, []string{"Size (bits)", "Hosts", "HABJ'14", "IMC'13", "IMC'07"})
+  percentStr := formatPercent(buckets["≤ 512"] , numRSAAuth)
+  printTableToFile(tableVIFile, 15,  []string{"≤ 512", percentStr, "350 (0.0%)", "0.1%", "3.94%"} )
+
+  percentStr = formatPercent(buckets["513 - 1023"] , numRSAAuth)
+  printTableToFile(tableVIFile, 15,  []string{"513 - 1023", percentStr, "20 (0.0%)", "0.0%", "1.42%"} )
+
+  percentStr = formatPercent(buckets["1024"] , numRSAAuth)
+  printTableToFile(tableVIFile, 15,  []string{"1024", percentStr, "87,760 (18.5%)", "10.5%", "88.35%"} )
+
+  percentStr = formatPercent(buckets["1025 - 2047"] , numRSAAuth)
+  printTableToFile(tableVIFile, 15,  []string{"1025 - 2047", percentStr, "20 (0.0%)", "0.7%", "0.01%"} )
+
+  percentStr = formatPercent(buckets["2048"] , numRSAAuth)
+  printTableToFile(tableVIFile, 15,  []string{"2048", percentStr, "374,294 (79.0%)", "86.4%", "6.14%"} )
+
+  percentStr = formatPercent(buckets["2049 - 4095"] , numRSAAuth)
+  printTableToFile(tableVIFile, 15,  []string{"2049 - 4095", percentStr, "251 (0.0%)", "0.0%", "0.00%"} )
+
+  percentStr = formatPercent(buckets["4096"] , numRSAAuth)
+  printTableToFile(tableVIFile, 15,  []string{"4096", percentStr, "11,093 (2.3%)", "2.3%", "0.19%"} )
+
+  percentStr = formatPercent(buckets["≥ 4097"] , numRSAAuth)
+  printTableToFile(tableVIFile, 15,  []string{"≥ 4097", percentStr, "22 (0.0%)", "0.0%", "0.00%"} )
 }
 
 func curveLookup (s string) (string, string) {

@@ -52,5 +52,8 @@ cp BigResult.txt $currDir
 cp TableI.txt $currDir
 cp TableII.txt $currDir
 cp TableIII.txt $currDir
+cp TableIV.txt $currDir
+cp TableV.txt $currDir
+cp TableVI.txt $currDir
 
 cd $currDir

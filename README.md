@@ -21,7 +21,7 @@ And run:
 Dependencies
 ============
 
-    sudo apt-get install openssl, libssl-dev, golang, sqlite3
+    sudo apt-get install libssl-dev, golang, sqlite3, hg
     export GOPATH=$HOME/go
 
 This has been confirmed to work with OpenSSL 1.0.2d and go 1.5.1 on Ubuntu 15.10. 
