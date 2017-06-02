@@ -51,10 +51,8 @@ type HandShakeResult struct {
 type ScanResult struct{
   Id int
   Error []ConnectionError
-  //golang doesn't have option sets (bitmasks). So....array of ints
   KeyExchangeMethods KeyExchangeMethod
   AuthMethods AuthMethod
-
   Handshakes []HandShakeResult
   Timestamp time.Time
   Comments string //drop exceptions in here to filter later

@@ -34,7 +34,7 @@ func main() {
   case *populateFlag:
     parsePopulateArgs(tail)
   case *analyzeFlag:
-    fmt.Println("Non-implemented analyze")
+    parseAnalyzeArgs(tail)
   default:
     parseScanOptions(sourceFile, 
                    *startPtr, 
@@ -43,6 +43,14 @@ func main() {
                    *rerun, 
                    *randSelection)
   }
+}
+
+func parseAnalyzeArgs(args []string) {
+  dbName := "scanDb.sqlite"
+  if len(args) == 1 {
+    dbName = args[0]
+  }
+  analyze(dbName)
 }
 
 func parsePopulateArgs(args []string) {

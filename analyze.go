@@ -13,12 +13,6 @@ import (
   "sort"
 )
 
-func check(e error) {
-  if e != nil {
-    log.Fatal(e)
-  }
-}
-
 func printWideTabletoFile(f *os.File, label string, data string) {
   statement := fmt.Sprintf("%-26s\t%s\n", label , data)
   _, err := f.WriteString(statement)
@@ -50,9 +44,7 @@ func queryNumError (db *sql.DB, bit int) int64 {
   return result
 }
 
-func main () {
-
-  dbName := "scanDb.sqlite"
+func analyze(dbName string) {
 
   db, err := sql.Open("sqlite3", dbName)
   check(err)
