@@ -37,6 +37,7 @@ func populateDb (dataDir string, outputName string) {
     createHandshakes := `
     create table handshakes (id integer not null primary key,
                              host integer,
+                             tlsVersion integer,
                              cipher text,
                              keyexid int,
                              keyexbits int ,
@@ -87,7 +88,7 @@ func populateDb (dataDir string, outputName string) {
         log.Printf("Error reading json in file %s: %s \n", f, err)
         continue
       }
-      log.Println(f, result)
+      //log.Println(f, result)
       resultChan <- result
     }
     close(resultChan)
@@ -102,7 +103,8 @@ func populateDb (dataDir string, outputName string) {
     check(err)
     defer insertHostStmt.Close()
 
-    insertHandshakeStmt, err := tx.Prepare("insert into handshakes (host, cipher, keyexid, keyexbits, keyexcurve, authid, authbits, authcurve ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?) ")
+    // insertHandshakeStmt, err := tx.Prepare("insert into handshakes (host, cipher, keyexid, keyexbits, keyexcurve, authid, authbits, authcurve ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?) ")
+    insertHandshakeStmt, err := tx.Prepare("insert into handshakes (host, cipher, tlsVersion, keyexid, keyexbits, keyexcurve, authid, authbits, authcurve ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?) ")
     check(err)
     defer insertHandshakeStmt.Close()
 
@@ -140,6 +142,7 @@ func populateDb (dataDir string, outputName string) {
         for _, handshake := range result.Handshakes {
           _, err = insertHandshakeStmt.Exec ( result.Id,
                                               handshake.Cipher,
+                                              handshake.TLSVersion,
                                               handshake.KeyExchangeID,
                                               handshake.KeyExchangeBits,
                                               handshake.KeyExchangeCurve,

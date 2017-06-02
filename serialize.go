@@ -40,7 +40,7 @@ const (
 
 type HandShakeResult struct {
   Cipher string
-  Protocol openssl.SSLVersion
+  TLSVersion openssl.SSLVersion
   KeyExchangeID int
   KeyExchangeBits int
   KeyExchangeCurve string //don't hard-code curve names and ask directly from OpenSSL

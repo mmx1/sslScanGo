@@ -41,18 +41,10 @@ fi
 cd $GOPATH/src/$scanner
 $GOPATH/bin/sslScanGo -start $startInd -end $endInd $filename
 
-analyzer="github.com/mmx1/sslScanAnalyzer"
-go get $analyzer && go install $analyzer
-
-rm -rf $GOPATH/src/$analyzer/data
-mv data $GOPATH/src/$analyzer
-cd $GOPATH/src/$analyzer
-
 rm -f scanDb.sqlite
 
-$GOPATH/bin/sslScanAnalyzer
-go build dbHelper/queryDB.go
-./queryDB
+$GOPATH/bin/sslScanGo -populate
+$GOPATH/bin/sslScanGo -analyze
 
 cp BigResult.txt $currDir
 cp TableI.txt $currDir
