@@ -21,8 +21,11 @@ And run:
 Dependencies
 ============
 
-    sudo apt-get install libssl-dev, golang, sqlite3, hg
+    //Ubuntu
+    sudo apt-get install libssl-dev golang sqlite3 mercurial
     export GOPATH=$HOME/go
+
+
 
 This has been confirmed to work with OpenSSL 1.0.2d and go 1.5.1 on Ubuntu 15.10. 
 Testing performed with OpenSSL 1.0.2g and go 1.7.4 on Ubuntu 17.04. 
