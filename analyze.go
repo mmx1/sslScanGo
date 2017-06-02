@@ -18,19 +18,19 @@ func analyze(dbName string) {
   check(err)
   defer db.Close()
 
+  printTableI(db)
   printTableII(db)
   numDHEEnabled := printMainResult(db)
   printTableIII(db, numDHEEnabled)
+  printTableIV(db)
+}
 
-  //Table I : Errors
+func printTableI (db *sql.DB) {
+    //Table I : Errors
   connRefusedCnt := queryNumError(db, 1)
   sslErrCnt := queryNumError(db, 2)
   timeoutCnt := queryNumError(db, 4)
   invalidHostnameCnt := queryNumError(db, 8)
-  connectionResetCnt := queryNumError(db, 16)
-  ipUnreacheableCnt := queryNumError(db, 32)
-  blockDosCnt := queryNumError(db, 64)
-  otherCnt := queryNumError(db, 512)
 
   tableIFile, err := os.Create("TableI.txt")
   check(err)
@@ -41,10 +41,6 @@ func analyze(dbName string) {
   printWideTabletoFile(tableIFile, "SSL Errors", strconv.Itoa(sslErrCnt))
   printWideTabletoFile(tableIFile, "Timeout", strconv.Itoa(timeoutCnt))
   printWideTabletoFile(tableIFile, "Invalid Host Name", strconv.Itoa(invalidHostnameCnt))
-  printWideTabletoFile(tableIFile, "Connection Reset Error", strconv.Itoa(connectionResetCnt))
-  printWideTabletoFile(tableIFile, "IP unreachable", strconv.Itoa(ipUnreacheableCnt))
-  printWideTabletoFile(tableIFile, "Blocked DOS", strconv.Itoa(blockDosCnt))
-  printWideTabletoFile(tableIFile, "Other Errors", strconv.Itoa(otherCnt))
   tableIFile.Close()
 }
 
@@ -157,18 +153,77 @@ func printMainResult (db *sql.DB) (int) {
   return numDHEEnabled
 }
 
+func printTableIV (db *sql.DB) {
+
+  numECKEQuery := "select count(distinct host) from handshakes where keyexid = 408"
+  numECKE := singleIntQuery(numECKEQuery, db)
+
+
+  curveRows, err := db.Query("select distinct keyexcurve from handshakes")
+  check(err)
+  var keCurves []string 
+  for curveRows.Next() {
+    var curveName string
+    err = curveRows.Scan(&curveName)
+    check(err)
+    if curveName != "" {
+      keCurves = append(keCurves, curveName)
+    }
+  }
+  curveRows.Close()
+
+  curveCount := make(map[string]int)
+  for _, name := range keCurves {
+    curveCountQuery := fmt.Sprintf("select count (distinct host) from handshakes where keyexcurve is '%s'", name)
+    curveCount[name] = singleIntQuery(curveCountQuery, db)
+  }
+
+  //Create TableIII File and fill with data
+  tableIVFile, err := os.Create("TableIV.txt")
+  check(err)
+  printTableFileHeader2(tableIVFile, "Curve", 15, "Hosts")
+
+  for name, hosts := range curveCount {
+    printTableFilePercentage2(tableIVFile, name, 15, hosts, numECKE)
+  }
+  _, err = tableIVFile.WriteString("\nTotal EC Key Exchange Servers: "+strconv.Itoa(numECKE))
+  tableIVFile.Close()
+
+}
+
 func printWideTabletoFile(f *os.File, label string, data string) {
   statement := fmt.Sprintf("%-26s\t%s\n", label , data)
   _, err := f.WriteString(statement)
   check(err)
 }
 
+func printTableFilePercentage2(f *os.File, label string, width int, data int, total int) {
+  per := float64(data)/float64(total)  * 100
+  format := fmt.Sprintf("%%-%ds\t%%d (%%s%%%%)\n", width)
+  statement := fmt.Sprintf(format, label , data, strconv.FormatFloat(per, 'f', 2, 64))
+  // statement := fmt.Sprintf("%-10s\t%d (%s%%)\n", label , data, strconv.FormatFloat(per, 'f', 2, 64))
+  _, err := f.WriteString(statement)
+  check(err)
+}
+
 func printTableFilePercentage(f *os.File, label string, data int, total int) {
   per := float64(data)/float64(total)  * 100
+  // format := fmt.Sprintf("%%-%ds\t%%s\n", width)
+  // statement := fmt.Sprintf(format, label , data)
   statement := fmt.Sprintf("%-10s\t%d (%s%%)\n", label , data, strconv.FormatFloat(per, 'f', 2, 64))
   _, err := f.WriteString(statement)
   check(err)
 }
+
+func printTableFileHeader2(f *os.File, label string, width int, data string) {
+  format := fmt.Sprintf("%%-%ds\t%%s\n", width)
+  statement := fmt.Sprintf(format, label , data)
+  _, err := f.WriteString(statement)
+  check(err)
+  _, err = f.WriteString("-------------------\n")
+  check(err)  
+}
+
 func printTableFileHeader(f *os.File, label string, data string) {
   statement := fmt.Sprintf("%-10s\t%s\n", label , data)
   _, err := f.WriteString(statement)
