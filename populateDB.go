@@ -9,19 +9,7 @@ import (
   "os"
 )
 
-func populateDb () {
-  args := os.Args
-  // expect src, destination , default to data/ scanDb.sqlite
-
-  dataDir := "./data/"
-  outputName := "./scanDb.sqlite"
-  switch len(args) {
-    case 3:
-      outputName = args[2]
-      fallthrough
-    case 2:
-      dataDir = args[1]
-  }
+func populateDb (dataDir string, outputName string) {
 
   _, err := os.Stat(outputName)
   dbExists := err == nil
@@ -67,12 +55,7 @@ func populateDb () {
 
   }
   
-  log.Println(dataDir, outputName)
-
   //todo, read 1m file and fill in name
-
-
-
   files, err := ioutil.ReadDir(dataDir)
   check(err)
 
@@ -104,7 +87,7 @@ func populateDb () {
         log.Printf("Error reading json in file %s: %s \n", f, err)
         continue
       }
-
+      log.Println(f, result)
       resultChan <- result
     }
     close(resultChan)
@@ -129,6 +112,9 @@ func populateDb () {
       select {
       case result, more := <- resultChan:
         done = !more
+        if done {
+          break;
+        }
 
         errorMask := 0
         //make into a bitmask

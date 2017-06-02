@@ -13,8 +13,8 @@ import (
 
 func main() {
 
-  // *populateFlag := flag.Bool("populate", false, "Populate SQLite table from json files")
-  // *analyzeFlag := flag.Bool("analyze", false, "Print report from SQlite")
+  populateFlag := flag.Bool("populate", false, "Populate SQLite table from json files")
+  analyzeFlag := flag.Bool("analyze", false, "Print report from SQlite")
 
   startPtr := flag.Int("start", 1, "start index")
   endPtr := flag.Int("end", 0, "end index")
@@ -30,13 +30,35 @@ func main() {
     sourceFile = tail[0]
   }
 
-  parseScanOptions(sourceFile, 
+  switch {
+  case *populateFlag:
+    parsePopulateArgs(tail)
+  case *analyzeFlag:
+    fmt.Println("Non-implemented analyze")
+  default:
+    parseScanOptions(sourceFile, 
                    *startPtr, 
                    *endPtr, 
                    *tlsVersionFlag, 
                    *rerun, 
                    *randSelection)
+  }
 }
+
+func parsePopulateArgs(args []string) {
+  // expect src, destination , default to data/ scanDb.sqlite
+  dataDir := "./data/"
+  outputName := "./scanDb.sqlite"
+  switch len(args) {
+    case 2:
+      outputName = args[1]
+      fallthrough
+    case 1:
+      dataDir = args[0]
+  }
+  populateDb(dataDir, outputName)
+}
+  
 
 func parseScanOptions (sourceFile string, 
                        start int, 
