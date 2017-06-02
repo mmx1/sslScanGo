@@ -112,13 +112,32 @@ func printTableIII(db *sql.DB, numDHEEnabled int) {
   tableIIIFile, err := os.Create("TableIII.txt")
   check(err)
   printTableFileHeader(tableIIIFile, 10, []string{"Size(bits)", "Hosts"})
-  printTableFilePercentage(tableIIIFile, 10, "<1024",lowDHE, numDHEEnabled, nil)
+  lowDheStr := formatPercent(lowDHE, numDHEEnabled)
+  printTableToFile(tableIIIFile, 10, []string{"<1024",lowDheStr, "97,494 (34.3%)" })
 
   for _, bitSz := range dheBitSizes{
-    printTableFilePercentage(tableIIIFile, 10, strconv.Itoa(bitSz), m[bitSz], numDHEEnabled, nil)
+    currDataStr := formatPercent(m[bitSz], numDHEEnabled)
+    printTableToFile(tableIIIFile, 10, []string{strconv.Itoa(bitSz), currDataStr, prevDHSizeData(bitSz)} )
   }
-  _, err = tableIIIFile.WriteString("\nTotal DHE Enabled Servers: "+strconv.Itoa(numDHEEnabled))
+  _, err = tableIIIFile.WriteString("\nTotal DHE Enabled Servers: " + strconv.Itoa(numDHEEnabled))
   tableIIIFile.Close()
+}
+
+func prevDHSizeData (size int) (string) {
+  switch size {
+  case 1024:
+    return "281,714 (99.3%)"
+  case 1544:
+    return "1 (0.0%)"
+  case 2048:
+    return "859 (0.3%)"
+  case 3248:
+    return "2 (0.0%)"
+  case 4096:
+    return "14 (0.0%)"
+  default:
+    return "0"
+  }
 }
 
 func printMainResult (db *sql.DB) (int) {
@@ -179,17 +198,37 @@ func printTableIV (db *sql.DB) {
     curveCount[name] = singleIntQuery(curveCountQuery, db)
   }
 
-  //Create TableIII File and fill with data
+  //Create TableIV File and fill with data
   tableIVFile, err := os.Create("TableIV.txt")
   check(err)
   printTableFileHeader(tableIVFile, 15, []string{"Curve", "Hosts"},)
 
   for name, hosts := range curveCount {
-    printTableFilePercentage(tableIVFile, 15, name, hosts, numECKE, nil)
+    resultStr := formatPercent(hosts, numECKE)
+    transName, prevData := curveLookup(name)
+    printTableToFile(tableIVFile, 15,  []string{transName, resultStr, prevData} )
   }
   _, err = tableIVFile.WriteString("\nTotal EC Key Exchange Servers: "+strconv.Itoa(numECKE))
   tableIVFile.Close()
+}
 
+func curveLookup (s string) (string, string) {
+  switch s{
+  case "P-256":
+    return "secp256r1", "81,789 (96.1%)"
+  case "P-384":
+    return "secp384r1", "86 (0.1%)"
+  case "P-521":
+    return "secp521r1", "73 (0.0%)"
+  case "B-571":
+    return "sect571r1", "316 (0.3%)"
+  case "brainpoolP512r1":
+    return "brainpoolP512r1", "0"
+  case "secp256k1":
+    return "secp256k1", "0"
+  default:
+    return "", ""
+  }
 }
 
 func printTableFileHeader(f *os.File, width int, labels []string) {
@@ -206,20 +245,6 @@ func printTableToFile(f *os.File, width int, labels []string) {
   }
   line += "\n"
 
-  _, err := f.WriteString(line)
-  check(err)
-}
-
-func printTableFilePercentage(f *os.File, width int, label string,  data int, total int, rest []string) {
-  per := float64(data)/float64(total)  * 100
-  initialformat := fmt.Sprintf("%%-%ds\t%%d (%%-%ds%%%%)\t", width, width)
-  line := fmt.Sprintf(initialformat, label , data, strconv.FormatFloat(per, 'f', 2, 64))
-
-  restFormat := fmt.Sprintf("%%-%ds\t", width)
-  for _, label := range rest {
-    line += fmt.Sprintf(restFormat, label)
-  }
-  line += "\n"
   _, err := f.WriteString(line)
   check(err)
 }
