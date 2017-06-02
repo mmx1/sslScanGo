@@ -36,12 +36,14 @@ func printTableI (db *sql.DB) (int) {
 
   tableIFile, err := os.Create("TableI.txt")
   check(err)
+  defer tableIFile.Close()
+
+  _, err = tableIFile.WriteString("Connection errors during TLS survey\n")
   printTableFileHeader(tableIFile, 26, []string{"Error", "Hosts"})
   printTableToFile(tableIFile, 26, []string{"Connection Refused Error", strconv.Itoa(connRefusedCnt) } )
   printTableToFile(tableIFile, 26, []string{"SSL Errors", strconv.Itoa(sslErrCnt - numTLSHosts) })
   printTableToFile(tableIFile, 26, []string{"Timeout", strconv.Itoa(timeoutCnt)})
   printTableToFile(tableIFile, 26, []string{"Invalid Host Name", strconv.Itoa(invalidHostnameCnt)})
-  tableIFile.Close()
 
   return numTLSHosts
 }
@@ -75,6 +77,7 @@ func printTableII_V (db *sql.DB, numEntries int) {
   dheCountStr := formatPercent(count[1], numEntries)
   ecCountStr := formatPercent(count[2], numEntries)
 
+  _, err = tableIIFile.WriteString("Key exchange method support on TLS servers\n")
   printTableFileHeader(tableIIFile, 14, []string{"Method", "Hosts", "HABJ'14", "IMC'07"})
 
   printTableToFile(tableIIFile, 14, []string{"RSA", rsaCountStr,"473,688 (99.9%)", "99.86%" } )
@@ -91,6 +94,7 @@ func printTableII_V (db *sql.DB, numEntries int) {
   dsaCountStr := formatPercent(count[5], numEntries)
   ecAuthCountStr := formatPercent(count[6], numEntries)
 
+  _, err = tableVFile.WriteString("Authentication method support on TLS servers\n")
   printTableFileHeader(tableVFile, 14, []string{"Method", "Hosts", "HABJ'14", "IMC'07"})
 
   printTableToFile(tableVFile, 14, []string{"RSA", rsaAuthCountStr,"473,780 (99.9%)", "≥99.86%" } )
@@ -130,6 +134,9 @@ func printTableIII(db *sql.DB, numDHEEnabled int) {
   //Create TableIII File and fill with data
   tableIIIFile, err := os.Create("TableIII.txt")
   check(err)
+  defer tableIIIFile.Close()
+
+  _, err = tableIIIFile.WriteString("Diffie-Hellman parameter size support for DHE key exchange\n")
   printTableFileHeader(tableIIIFile, 14, []string{"Size(bits)", "Hosts"})
   lowDheStr := formatPercent(lowDHE, numDHEEnabled)
   printTableToFile(tableIIIFile, 14, []string{"≤768",lowDheStr, "97,494 (34.3%)" })
@@ -170,6 +177,8 @@ func printMainResult (db *sql.DB) (int) {
                        where keyexid = 28 AND authid = 6 AND keyexbits < authbits`
   numBadDHEParam := singleIntQuery(badDHEParamQuery, db)
   log.Println("Total number of bad DHE params: ", numBadDHEParam)
+  //No DHE and EC pairing
+  //select count(*) from handshakes where keyexid = 28 AND authid != 6;
 
   //New Version of openssl does not accept connections with key size lower than 1024
   //Captured as error flag 1 << 7 or 128
@@ -184,9 +193,10 @@ func printMainResult (db *sql.DB) (int) {
   check(err)
 
   badPercentage :=  formatPercent(numBadDHEParam, numDHEEnabled) 
-  printTableFileHeader(brFile, 15, []string{"", "2017",  "HABJ'14"})
-  printTableToFile(brFile, 15, []string{"Weak DH Parameters", badPercentage, "82.9%"} )
-  printTableToFile(brFile, 15, []string{"Total DHE hosts", strconv.Itoa(numDHEEnabled), "283,647"} )
+  _, err = brFile.WriteString("Hosts using weaker DH Parameters than Authentication Key strength\n")
+  printTableFileHeader(brFile, 20, []string{"", "2017",  "HABJ'14"})
+  printTableToFile(brFile, 20, []string{"Weak DH Parameters", badPercentage, "82.9%"} )
+  printTableToFile(brFile, 20, []string{"Total DHE hosts", strconv.Itoa(numDHEEnabled), "283,647"} )
 
   brFile.Close()
 
@@ -220,15 +230,17 @@ func printTableIV (db *sql.DB) {
   //Create TableIV File and fill with data
   tableIVFile, err := os.Create("TableIV.txt")
   check(err)
-  printTableFileHeader(tableIVFile, 15, []string{"Curve", "Hosts"},)
+  defer tableIVFile.Close()
 
+  _, err = tableIVFile.WriteString("Elliptic curves used for ECDHE key exchange\n")
+  printTableFileHeader(tableIVFile, 15, []string{"Curve", "Hosts"},)
   for name, hosts := range curveCount {
     resultStr := formatPercent(hosts, numECKE)
     transName, prevData := curveLookup(name)
     printTableToFile(tableIVFile, 15,  []string{transName, resultStr, prevData} )
   }
   _, err = tableIVFile.WriteString("\nTotal EC Key Exchange Servers: "+strconv.Itoa(numECKE))
-  tableIVFile.Close()
+  check(err)
 }
 
 func printTableVI () {
