@@ -12,3 +12,9 @@ currDir=$PWD
 
 rm -rf $GOPATH/src/github.com/mmx1/sslScanGo/
 go get $scanner && go install $scanner
+
+cp $GOPATH/src/$scanner/resources/archive.tar.gz .
+tar -xzf archive.tar.gz
+
+$GOPATH/bin/sslScanGo -populate
+$GOPATH/bin/sslScanGo -analyze

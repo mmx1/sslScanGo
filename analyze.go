@@ -22,13 +22,13 @@ func analyze(dbName string) {
   check(err)
   defer db.Close()
 
-  // numTLSHosts := printTableI(db)
-  // printTableII_V(db, numTLSHosts)
-  // numDHEEnabled := printMainResult(db)
+  numTLSHosts := printTableI(db)
+  printTableII_V(db, numTLSHosts)
+  numDHEEnabled := printMainResult(db)
   printMainGraph(db)
-  // printTableIII(db, numDHEEnabled)
-  // printTableIV(db)
-  // printTableVI(db)
+  printTableIII(db, numDHEEnabled)
+  printTableIV(db)
+  printTableVI(db)
 }
 
 func printTableI (db *sql.DB) (int) {
