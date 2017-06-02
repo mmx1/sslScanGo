@@ -11,6 +11,7 @@ export GOPATH=$HOME/go
 scanner="github.com/mmx1/sslScanGo"
 currDir=$PWD
 
+rm -rf $GOPATH/src/$scanner
 go get $scanner && go install $scanner
 
 #read -p 'Enter File name ' filename
@@ -35,7 +36,6 @@ fi
 if [ $3 ]; then
 	endInd=$3
 fi
-cd $GOPATH/src/$scanner
 $GOPATH/bin/sslScanGo -r 300 -start $startInd -end $endInd $filename
 
 rm -f scanDb.sqlite
@@ -50,6 +50,6 @@ cp TableIII.txt $currDir
 cp TableIV.txt $currDir
 cp TableV.txt $currDir
 cp TableVI.txt $currDir
-cp MainResult.png $currDir
+cp mainResult.png $currDir
 
 cd $currDir

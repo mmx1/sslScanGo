@@ -82,7 +82,7 @@ func parseScanOptions (sourceFile string,
 
     for i := 0; i < randCount; i++ {
       index := int(rndGen.Float32() * 1000 + 1)
-      fmt.Println("generated index", index)
+      // fmt.Println("generated index", index)
       if !selectedIndices[index] {
         selectedIndices[index] = true
       }else{

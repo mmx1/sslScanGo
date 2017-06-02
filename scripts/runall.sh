@@ -12,7 +12,7 @@ export GOPATH=$HOME/go
 scanner="github.com/mmx1/sslScanGo"
 currDir=$PWD
 
-rm -f $GOPATH/bin/sslScanGo
+rm -f $GOPATH/src/github.com/mmx1/sslScanGo/
 go get $scanner && go install $scanner
 
 #read -p 'Enter File name ' filename
@@ -37,21 +37,9 @@ fi
 if [ $3 ]; then
 	endInd=$3
 fi
-
-cd $GOPATH/src/$scanner
 $GOPATH/bin/sslScanGo -start $startInd -end $endInd $filename
 
 rm -f scanDb.sqlite
 
 $GOPATH/bin/sslScanGo -populate
 $GOPATH/bin/sslScanGo -analyze
-
-cp BigResult.txt $currDir
-cp TableI.txt $currDir
-cp TableII.txt $currDir
-cp TableIII.txt $currDir
-cp TableIV.txt $currDir
-cp TableV.txt $currDir
-cp TableVI.txt $currDir
-
-cd $currDir
