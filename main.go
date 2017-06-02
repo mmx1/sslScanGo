@@ -74,7 +74,6 @@ func parseScanOptions (sourceFile string,
                        tlsVersionStr string, 
                        reRunFile string,
                        randCount int) {
-  
   var selectedIndices map[int]bool
   if randCount > 0 {
     fmt.Println(randCount, "random selected, ignoring other parameters")
@@ -107,6 +106,10 @@ func parseScanOptions (sourceFile string,
     }
   }
   tlsVersions := tlsFlagToSlice(tlsVersionStr)
+  if sourceFile == "" {
+    sourceFile = "top-1m.csv"
+  }
+
   scan(sourceFile, start, end, selectedIndices, tlsVersions)
 }
 
