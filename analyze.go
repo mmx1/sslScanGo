@@ -16,15 +16,19 @@ func analyze(dbName string) {
   check(err)
   defer db.Close()
 
-  printTableI(db)
-  printTableII(db)
+  numTLSHosts := printTableI(db)
+  printTableII_V(db, numTLSHosts)
   numDHEEnabled := printMainResult(db)
   printTableIII(db, numDHEEnabled)
   printTableIV(db)
 }
 
-func printTableI (db *sql.DB) {
+func printTableI (db *sql.DB) (int) {
     //Table I : Errors
+  var numTLSHosts int
+  err := db.QueryRow("select count(distinct host) from handshakes").Scan(&numTLSHosts)
+  check(err)
+
   connRefusedCnt := queryNumError(db, 1)
   sslErrCnt := queryNumError(db, 2)
   timeoutCnt := queryNumError(db, 4)
@@ -34,17 +38,16 @@ func printTableI (db *sql.DB) {
   check(err)
   printTableFileHeader(tableIFile, 26, []string{"Error", "Hosts"})
   printTableToFile(tableIFile, 26, []string{"Connection Refused Error", strconv.Itoa(connRefusedCnt) } )
-  printTableToFile(tableIFile, 26, []string{"SSL Errors", strconv.Itoa(sslErrCnt) })
+  printTableToFile(tableIFile, 26, []string{"SSL Errors", strconv.Itoa(sslErrCnt - numTLSHosts) })
   printTableToFile(tableIFile, 26, []string{"Timeout", strconv.Itoa(timeoutCnt)})
   printTableToFile(tableIFile, 26, []string{"Invalid Host Name", strconv.Itoa(invalidHostnameCnt)})
   tableIFile.Close()
+
+  return numTLSHosts
 }
 
-func printTableII (db *sql.DB) {
+func printTableII_V (db *sql.DB, numEntries int) {
    // TABLE II CODE
-  var numEntries int
-  err := db.QueryRow("select count(distinct host) from handshakes").Scan(&numEntries)
-  check(err)
   
   //used to just get the list of Key Exchange messages (columns of a single row) 
   rows, err := db.Query("select * from hosts where id=1")
@@ -55,7 +58,7 @@ func printTableII (db *sql.DB) {
   log.Println("Columns are: ", columns)
   var count []int
   for i, v := range columns {
-    if i >= 3 && i != len(columns)-1 {
+    if i >= 3 {
         statement := fmt.Sprintf("select count(*) from hosts where %s= 1", v)
         val := singleIntQuery(statement, db)
         //log.Println("Total number of "+v+" :", val)
@@ -66,19 +69,35 @@ func printTableII (db *sql.DB) {
 
   tableIIFile, err := os.Create("TableII.txt")
   check(err)
+  defer tableIIFile.Close()
   
   rsaCountStr := formatPercent(count[0], numEntries)
   dheCountStr := formatPercent(count[1], numEntries)
   ecCountStr := formatPercent(count[2], numEntries)
 
-  printTableFileHeader(tableIIFile, 12, []string{"Method", "Hosts", "HABJ'14", "IMC'07"})
+  printTableFileHeader(tableIIFile, 14, []string{"Method", "Hosts", "HABJ'14", "IMC'07"})
 
-  printTableToFile(tableIIFile, 12, []string{"RSA", rsaCountStr,"473,688 (99.9%)", "99.86%" } )
-  printTableToFile(tableIIFile, 12, []string{"DHE", dheCountStr,"283,647 (59.8%)", "57.57%" } )
-  printTableToFile(tableIIFile, 12, []string{"ECDHE", ecCountStr,"85,070 (17.9%)" } )
+  printTableToFile(tableIIFile, 14, []string{"RSA", rsaCountStr,"473,688 (99.9%)", "99.86%" } )
+  printTableToFile(tableIIFile, 14, []string{"DHE", dheCountStr,"283,647 (59.8%)", "57.57%" } )
+  printTableToFile(tableIIFile, 14, []string{"ECDHE", ecCountStr,"85,070 (17.9%)" } )
 
-  err = tableIIFile.Close()
+
+  tableVFile, err := os.Create("TableV.txt")
   check(err)
+  defer tableVFile.Close()
+  
+  rsaAuthCountStr := formatPercent(count[3], numEntries)
+  anonCountStr := formatPercent(count[4], numEntries)
+  dsaCountStr := formatPercent(count[5], numEntries)
+  ecAuthCountStr := formatPercent(count[6], numEntries)
+
+  printTableFileHeader(tableVFile, 14, []string{"Method", "Hosts", "HABJ'14", "IMC'07"})
+
+  printTableToFile(tableVFile, 14, []string{"RSA", rsaAuthCountStr,"473,780 (99.9%)", "≥99.86%" } )
+  printTableToFile(tableVFile, 14, []string{"Anonymous", anonCountStr,"7750 (0.0%)", "0.02%" } )
+  printTableToFile(tableVFile, 14, []string{"DSA", dsaCountStr,"22 (0.0%)" } )
+  printTableToFile(tableVFile, 14, []string{"ECDSA/ECDH", ecAuthCountStr,"3 (0.0%)" } )
+
 }
 
 func printTableIII(db *sql.DB, numDHEEnabled int) {
@@ -111,13 +130,13 @@ func printTableIII(db *sql.DB, numDHEEnabled int) {
   //Create TableIII File and fill with data
   tableIIIFile, err := os.Create("TableIII.txt")
   check(err)
-  printTableFileHeader(tableIIIFile, 10, []string{"Size(bits)", "Hosts"})
+  printTableFileHeader(tableIIIFile, 14, []string{"Size(bits)", "Hosts"})
   lowDheStr := formatPercent(lowDHE, numDHEEnabled)
-  printTableToFile(tableIIIFile, 10, []string{"<1024",lowDheStr, "97,494 (34.3%)" })
+  printTableToFile(tableIIIFile, 14, []string{"≤768",lowDheStr, "97,494 (34.3%)" })
 
   for _, bitSz := range dheBitSizes{
     currDataStr := formatPercent(m[bitSz], numDHEEnabled)
-    printTableToFile(tableIIIFile, 10, []string{strconv.Itoa(bitSz), currDataStr, prevDHSizeData(bitSz)} )
+    printTableToFile(tableIIIFile, 14, []string{strconv.Itoa(bitSz), currDataStr, prevDHSizeData(bitSz)} )
   }
   _, err = tableIIIFile.WriteString("\nTotal DHE Enabled Servers: " + strconv.Itoa(numDHEEnabled))
   tableIIIFile.Close()
@@ -164,10 +183,11 @@ func printMainResult (db *sql.DB) (int) {
   brFile, err := os.Create("BigResult.txt")
   check(err)
 
-  _, err = brFile.WriteString("Number of DHE enabled servers are: " + strconv.Itoa(numDHEEnabled)+"\n")
-  _, err = brFile.WriteString("Number of Weak DHE Parameters: "+strconv.Itoa(numBadDHEParam)+ "\n")
-  badPercentage := float64(numBadDHEParam)/float64(numDHEEnabled) * 100
-  _, err = brFile.WriteString("\nFor the Grand result of: "+strconv.FormatFloat(badPercentage, 'f', 1, 64)+"%")
+  badPercentage :=  formatPercent(numBadDHEParam, numDHEEnabled) 
+  printTableFileHeader(brFile, 15, []string{"", "2017",  "HABJ'14"})
+  printTableToFile(brFile, 15, []string{"Weak DH Parameters", badPercentage, "82.9%"} )
+  printTableToFile(brFile, 15, []string{"Total DHE hosts", strconv.Itoa(numDHEEnabled), "283,647"} )
+
   brFile.Close()
 
   return numDHEEnabled
@@ -177,7 +197,6 @@ func printTableIV (db *sql.DB) {
 
   numECKEQuery := "select count(distinct host) from handshakes where keyexid = 408"
   numECKE := singleIntQuery(numECKEQuery, db)
-
 
   curveRows, err := db.Query("select distinct keyexcurve from handshakes")
   check(err)
@@ -210,6 +229,10 @@ func printTableIV (db *sql.DB) {
   }
   _, err = tableIVFile.WriteString("\nTotal EC Key Exchange Servers: "+strconv.Itoa(numECKE))
   tableIVFile.Close()
+}
+
+func printTableVI () {
+
 }
 
 func curveLookup (s string) (string, string) {
