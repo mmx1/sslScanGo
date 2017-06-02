@@ -12,14 +12,21 @@ package main
 import "C"
 
 import (
-    "log"
+    "bufio"
     "errors"
-    // "fmt"
-    "strings"
-    "time"
-    "net" 
+    "fmt"
     "github.com/mmx1/opensslgo"
+    "log"
+    "net"
+    "os"
+    "time"
+    "strconv"
+    "strings"
+    "sync"
+    "sync/atomic"
 )
+
+var numProcesses = 300
 
 type sslCheckOptions struct {
   host string
@@ -29,36 +36,155 @@ type sslCheckOptions struct {
   result ScanResult
 }
 
+func check(e error) {
+    if e != nil {
+        log.Fatal(e)
+    }
+}
+
+func scan(sourceFile string, start int, end int, scanIndices map[int]bool, tlsVersions []openssl.SSLVersion) {
+
+  f, err := os.Open(sourceFile)
+  check(err)
+  defer f.Close()
+
+  globalLimiter := time.NewTicker(time.Millisecond * 100)
+  var wg sync.WaitGroup
+
+  processes := make(chan int, numProcesses)
+  for i := 0; i < numProcesses; i++ {
+    processes <- 1
+  }
+
+  var done uint32 = 0
+  var total int
+  if len(scanIndices) == 0 {
+    total = end - start + 1
+  }else{
+    total = len(scanIndices)
+  }
+  selectedTotal := len(scanIndices)
+
+  scanner := bufio.NewScanner(f)
+  for scanner.Scan() {
+    tokens := strings.Split(scanner.Text(), ",")
+    // fmt.Println(tokens)
+    if len(tokens) < 2 {
+      continue
+    }
+
+    lineNumber, err := strconv.Atoi(tokens[0])
+    check(err)
+
+    if scanIndices == nil { //use start and end
+      if lineNumber < start {
+        continue
+      }
+      if lineNumber > end && end != 0 {
+        break
+      }
+    }else{
+      if !scanIndices[lineNumber] {
+        continue
+      }else{
+        selectedTotal--
+      }
+      // fmt.Println("Selected", lineNumber)
+    }
+
+    <- processes
+    wg.Add(1)
+    go func(lineNumber int, host string) {
+      
+      defer func () {
+        processes <- 1
+        wg.Done()
+        v := atomic.AddUint32(&done, 1)
+        fmt.Printf("Done with host %s, %d of %d \n", host, v, total )
+      } ()
+      options := sslCheckOptions{ host: host + ":443", 
+                                  port: 443,
+                                  result: ScanResult{Id:lineNumber,
+                                                     Timestamp: time.Now() } ,
+                                  hostTicker: time.NewTicker(time.Second),
+                                  globalTicker: globalLimiter,
+                                }
+      options.scanHost(tlsVersions)
+      options.hostTicker.Stop()
+      //fmt.Println("main", host, options.result)
+      options.print(strconv.Itoa(lineNumber))
+    } (lineNumber, tokens[1])
+
+    //early end if using map
+    if scanIndices != nil && selectedTotal == 0 {
+      break;
+    }
+
+  }
+
+  wg.Wait()
+  globalLimiter.Stop()
+
+  if err := scanner.Err(); err != nil {
+    log.Fatal(err)
+  }
+}
+
+func (o *sslCheckOptions) scanHost(tlsVersions []openssl.SSLVersion) {
+  o.hostTicker = time.NewTicker(time.Second)
+
+  //initial TCP connection to 443 port
+  o.rateLimit()
+  conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
+  if err != nil {
+    //TODO : fine-grain error check
+    log.Println("Error in connection start to host ", o.host, err)
+    o.appendError(connectionRefused, err)
+    if strings.HasPrefix(o.host, "www") {
+      return
+    }
+
+    log.Println("Trying www prefix for host", o.host)
+    o.host = "www." + o.host
+
+    o.rateLimit()
+    conn, err = net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
+    if err != nil {
+      log.Println("Could not connect to host", o.host, err)
+      o.appendError(connectionRefused, err)
+      return
+    }
+  }
+  conn.Close()
+
+  for _, version := range tlsVersions {
+    o.testProtocolCiphers(version)
+  }
+}
+
 func (o sslCheckOptions) rateLimit () {
   <-o.hostTicker.C
   <-o.globalTicker.C
 }
 
-func (o *sslCheckOptions) testProtocolCipher (cipherName string, tlsVersion openssl.SSLVersion) (string, error) {
+func (o *sslCheckOptions) testProtocolCipher (cipherName string, tlsVersion openssl.SSLVersion) (string){
   // fmt.Println("trying", s.host, cipherName)
 
   var handshake HandShakeResult
 
-  const request = "GET / HTTP/1.0\r\nUser-Agent: SSLScan\r\nHost: %s\r\n\r\n"
-
   //creates TLS context (SSL disabled by default)
   context, err := openssl.NewCtxWithVersion(tlsVersion)
-  check(err)
+  //check(err)
+  if err != nil { //if tlsVersion is not locally supported, report and continue
+    log.Println(err)
+    return ""
+  }
 
   err = context.SetCipherList ( cipherName )
   check(err)
 
   o.rateLimit()
   conn, err := openssl.Dial("tcp", o.host, context, 0)
-  // conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
-  // if err != nil {
-  //   o.appendError(blockedDoS, err)
-  //   return "", err
-  // }
-
-  // conn_ssl, err := openssl.Client(conn, context)
-  // check(err)
-  // err = conn_ssl.Handshake()  
 
   if err != nil {
     //inspect for weak dh key
@@ -71,7 +197,7 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string, tlsVersion open
       o.appendError(timeout, err)
     }
     o.appendError(sslError, err)
-    return "", err
+    return ""
   }
   defer conn.Close()
 
@@ -132,7 +258,7 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string, tlsVersion open
   }
 
   o.result.Handshakes = append(o.result.Handshakes, handshake)
-  return handshake.Cipher, nil  
+  return handshake.Cipher  
   
 }
 
@@ -143,15 +269,13 @@ func (o *sslCheckOptions) testProtocolCiphers (tlsVersion openssl.SSLVersion) {
 
   for true {
     //fmt.Print(dheCipher)
-    cipher, _ := o.testProtocolCipher(cipherList, tlsVersion)
+    cipher := o.testProtocolCipher(cipherList, tlsVersion)
     if cipher != "" {
       cipherList += ":!" + cipher
     }else{
       break;
     }
   }
-
-  //fmt.Println(o.host, "Done")
 
   return
 }
@@ -174,37 +298,5 @@ func (o *sslCheckOptions) appendError (cE ConnectionError, e error) {
   } else {
     o.result.Error = append(o.result.Error, cE)
     o.result.Comments += e.Error() + "\n"
-  }
-}
-
-func (o *sslCheckOptions) scanHost(tlsVersions []openssl.SSLVersion) {
-  o.hostTicker = time.NewTicker(time.Second)
-
-  //initial TCP connection to 443 port
-  o.rateLimit()
-  conn, err := net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
-  if err != nil {
-    //TODO : fine-grain error check
-    log.Println("Error in connection start to host ", o.host, err)
-    o.appendError(connectionRefused, err)
-    if strings.HasPrefix(o.host, "www") {
-      return
-    }
-
-    log.Println("Trying www prefix for host", o.host)
-    o.host = "www." + o.host
-
-    o.rateLimit()
-    conn, err = net.DialTimeout("tcp", o.host, time.Duration(30)*time.Second)
-    if err != nil {
-      log.Println("Could not connect to host", o.host, err)
-      o.appendError(connectionRefused, err)
-      return
-    }
-  }
-  conn.Close()
-
-  for _, version := range tlsVersions {
-    o.testProtocolCiphers(version)
   }
 }

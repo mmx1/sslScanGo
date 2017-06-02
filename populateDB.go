@@ -3,76 +3,13 @@ package main
 import (
   "encoding/json"
   "database/sql"
-  //"fmt"
   _ "github.com/mattn/go-sqlite3"
   "io/ioutil"
   "log"
   "os"
-  "time"
-  //"strconv"
-  //"runtime"
 )
 
-type ConnectionError int
-const (
-  connectionRefused ConnectionError = iota // == 0
-  sslError // == 1
-  timeout
-  invalidHostname
-  connectionReset
-  ipUnreacheable
-  blockedDoS
-  dhKeyTooSmall
-  dhRSAmismatch
-  other
-)
-
-type KeyExchangeMethod int8
-const (
-  rsaKeyExch KeyExchangeMethod = 1 << iota
-  dhe //2
-  ecdhe //4
-  fixedECDH //8
-)
-
-type AuthMethod int8
-const (
-  rsaAuth AuthMethod = 1 << iota
-  anonymous
-  dsa
-  ec
-)
-
-type HandShakeResult struct {
-  Cipher string
-  KeyExchangeID int
-  KeyExchangeBits int
-  KeyExchangeCurve string //don't hard-code curve names and ask directly from OpenSSL
-  AuthKeyId int
-  AuthKeyBits int
-  AuthKeyCurve string
-}
-
-type ScanResult struct{
-  Id int
-  Error []ConnectionError
-  //golang doesn't have option sets (bitmasks). So....array of ints
-  KeyExchangeMethods KeyExchangeMethod
-  AuthMethods AuthMethod
-
-  Handshakes []HandShakeResult
-  Timestamp time.Time
-  Comments string //drop exceptions in here to filter later
-}
-
-func check(e error) {
-  if e != nil {
-    log.Fatal(e)
-  }
-}
-
-
-func main () {
+func populateDb () {
   args := os.Args
   // expect src, destination , default to data/ scanDb.sqlite
 
@@ -138,19 +75,6 @@ func main () {
 
   files, err := ioutil.ReadDir(dataDir)
   check(err)
-  // done := make(chan int, len(files))
-  // var nW int
-  // if len(files) < 20 {
-  //   nW = len(files)
-  // } else {
-  //   nW = 20
-  // }
-  // worker := make (chan int, nW)
-  // dbLock := make(chan int, 1)
-  // dbLock <- 1
-  // for i := 0; i < nW; i ++ {
-  //   worker <- 1
-  // } 
 
   resultChan := make(chan ScanResult, 100)
 
@@ -253,64 +177,5 @@ func main () {
 
   }
 
-      
-      
-            
-      
-
-      
-
-
-
-      // log.Printf(result)
-
-      
-
-      // For Concurrency Need A transaction for adding to the database
-      //<-dbLock
-      
-      //counter := 0
-      // GETTING A 'DATABASE IS LOCKED' ERROR 
-      // THIS MEANS THAT "LIKELY" the thread holding the lock on the database was removed by the 
-      // scheduler...
-      // for err != nil {
-      //   if counter >= 1000 {
-      //     break
-      //   }
-      //   runtime.Gosched()
-      //   time.Sleep(100 * time.Millisecond)
-      //   insertHostStmt, err = tx.Prepare("insert into hosts (id, errors, keyExRSA, keyExDHE, keyExECDHE, authRSA, authAnon, authDSA, authEC, comments) VALUES( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )")
-      //   counter++
-      // }
-
-      //check(err)
-
-      
-      //todo, export constants from serialze.go?
-      
-      // COMMITS THE TRANSACTION TO THE DATABASE (RELEASES THE DATABASE LOCK)
-      // ALSO anything tied (state: i.e. insertHostStmt) to this transaction is deleted
-      // err = tx.Commit()
-      // counter = 0
-      // for err != nil {
-      //   if counter >= 100 {
-      //     //log.Println("here commit1")
-      //     log.Fatal(err)
-      //   }
-      //   runtime.Gosched()
-      //   err = tx.Commit()
-      //   counter++
-      // }
-      // insertHostStmt.Close()
-      // tx, err = db.Begin()
-      // if err != nil {
-      //   //log.Println("here begin2")
-      // }
-      // check(err)
-
-  //}
-  // for i := 0; i < len(files); i++ {
-  //   <-done
-  // }
   log.Println("Finished the insert of all files: ", len(files))
 }
