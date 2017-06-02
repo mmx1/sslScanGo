@@ -209,6 +209,7 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string, tlsVersion open
   handshake.KeyExchangeID = tmpKeyId
   handshake.KeyExchangeBits = tmpKeyBits
   handshake.KeyExchangeCurve = tmpKeyCurveName
+  handshake.Protocol = tlsVersion
   
 
   // fmt.Printf("Tmp key: 0x%x, %d, %s\n",  tmpKeyId, tmpKeyBits, tmpKeyCurveName)

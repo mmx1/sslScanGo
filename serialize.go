@@ -2,7 +2,7 @@ package main
 
 import (
   "encoding/json"
-  // "fmt"
+  "github.com/mmx1/opensslgo"
   "os"
   "strconv"
   "time"
@@ -40,6 +40,7 @@ const (
 
 type HandShakeResult struct {
   Cipher string
+  Protocol openssl.SSLVersion
   KeyExchangeID int
   KeyExchangeBits int
   KeyExchangeCurve string //don't hard-code curve names and ask directly from OpenSSL
