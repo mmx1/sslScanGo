@@ -1,16 +1,14 @@
 package main
 
 import (
-  //"encoding/json"
   "database/sql"
   "fmt"
   _ "github.com/mattn/go-sqlite3"
-  //"io/ioutil"
   "log"
   "os"
-  //"time"
-  "strconv"
   "sort"
+  "strconv"
+  "strings"
 )
 
 func analyze(dbName string) {
@@ -34,14 +32,53 @@ func printTableI (db *sql.DB) {
 
   tableIFile, err := os.Create("TableI.txt")
   check(err)
-  printWideTabletoFile(tableIFile, "Error", "Hosts")
-  _, err = tableIFile.WriteString("-----------------------------------------\n")
-  check(err)
-  printWideTabletoFile(tableIFile, "Connection Refused Error", strconv.Itoa(connRefusedCnt))
-  printWideTabletoFile(tableIFile, "SSL Errors", strconv.Itoa(sslErrCnt))
-  printWideTabletoFile(tableIFile, "Timeout", strconv.Itoa(timeoutCnt))
-  printWideTabletoFile(tableIFile, "Invalid Host Name", strconv.Itoa(invalidHostnameCnt))
+  printTableFileHeader(tableIFile, 26, []string{"Error", "Hosts"})
+  printTableToFile(tableIFile, 26, []string{"Connection Refused Error", strconv.Itoa(connRefusedCnt) } )
+  printTableToFile(tableIFile, 26, []string{"SSL Errors", strconv.Itoa(sslErrCnt) })
+  printTableToFile(tableIFile, 26, []string{"Timeout", strconv.Itoa(timeoutCnt)})
+  printTableToFile(tableIFile, 26, []string{"Invalid Host Name", strconv.Itoa(invalidHostnameCnt)})
   tableIFile.Close()
+}
+
+func printTableII (db *sql.DB) {
+   // TABLE II CODE
+  var numEntries int
+  err := db.QueryRow("select count(distinct host) from handshakes").Scan(&numEntries)
+  check(err)
+  
+  //used to just get the list of Key Exchange messages (columns of a single row) 
+  rows, err := db.Query("select * from hosts where id=1")
+  columns, err := rows.Columns()
+  check(err)
+  rows.Close()
+
+  log.Println("Columns are: ", columns)
+  var count []int
+  for i, v := range columns {
+    if i >= 3 && i != len(columns)-1 {
+        statement := fmt.Sprintf("select count(*) from hosts where %s= 1", v)
+        val := singleIntQuery(statement, db)
+        //log.Println("Total number of "+v+" :", val)
+        count = append(count, val)
+    }
+  }
+  log.Println(count)
+
+  tableIIFile, err := os.Create("TableII.txt")
+  check(err)
+  
+  rsaCountStr := formatPercent(count[0], numEntries)
+  dheCountStr := formatPercent(count[1], numEntries)
+  ecCountStr := formatPercent(count[2], numEntries)
+
+  printTableFileHeader(tableIIFile, 12, []string{"Method", "Hosts", "HABJ'14", "IMC'07"})
+
+  printTableToFile(tableIIFile, 12, []string{"RSA", rsaCountStr,"473,688 (99.9%)", "99.86%" } )
+  printTableToFile(tableIIFile, 12, []string{"DHE", dheCountStr,"283,647 (59.8%)", "57.57%" } )
+  printTableToFile(tableIIFile, 12, []string{"ECDHE", ecCountStr,"85,070 (17.9%)" } )
+
+  err = tableIIFile.Close()
+  check(err)
 }
 
 func printTableIII(db *sql.DB, numDHEEnabled int) {
@@ -74,50 +111,14 @@ func printTableIII(db *sql.DB, numDHEEnabled int) {
   //Create TableIII File and fill with data
   tableIIIFile, err := os.Create("TableIII.txt")
   check(err)
-  printTableFileHeader(tableIIIFile, "Size(bits)", "Hosts")
-  printTableFilePercentage(tableIIIFile, "<1024", lowDHE, numDHEEnabled)
+  printTableFileHeader(tableIIIFile, 10, []string{"Size(bits)", "Hosts"})
+  printTableFilePercentage(tableIIIFile, 10, "<1024",lowDHE, numDHEEnabled, nil)
 
   for _, bitSz := range dheBitSizes{
-    printTableFilePercentage(tableIIIFile, strconv.Itoa(bitSz), m[bitSz], numDHEEnabled)
+    printTableFilePercentage(tableIIIFile, 10, strconv.Itoa(bitSz), m[bitSz], numDHEEnabled, nil)
   }
   _, err = tableIIIFile.WriteString("\nTotal DHE Enabled Servers: "+strconv.Itoa(numDHEEnabled))
   tableIIIFile.Close()
-}
-
-func printTableII (db *sql.DB) {
-   // TABLE II CODE
-  var numEntries int
-  err := db.QueryRow("select count(distinct host) from handshakes").Scan(&numEntries)
-  check(err)
-  
-  //used to just get the list of Key Exchange messages (columns of a single row) 
-  rows, err := db.Query("select * from hosts where id=1")
-  columns, err := rows.Columns()
-  check(err)
-  rows.Close()
-
-  log.Println("Columns are: ", columns)
-  var count []int
-  for i, v := range columns {
-    if i >= 3 && i != len(columns)-1 {
-        statement := fmt.Sprintf("select count(*) from hosts where %s= 1", v)
-        val := singleIntQuery(statement, db)
-        //log.Println("Total number of "+v+" :", val)
-        count = append(count, val)
-    }
-  }
-  log.Println(count)
-
-  tableIIFile, err := os.Create("TableII.txt")
-  check(err)
-  
-  printTableFileHeader(tableIIFile, "METHOD", "HOST")
-  printTableFilePercentage(tableIIFile, "RSA", count[0], numEntries)
-  printTableFilePercentage(tableIIFile, "DHE", count[1], numEntries)
-  printTableFilePercentage(tableIIFile, "ECDHE", count[2], numEntries)
-
-  err = tableIIFile.Close()
-  check(err)
 }
 
 func printMainResult (db *sql.DB) (int) {
@@ -181,55 +182,51 @@ func printTableIV (db *sql.DB) {
   //Create TableIII File and fill with data
   tableIVFile, err := os.Create("TableIV.txt")
   check(err)
-  printTableFileHeader2(tableIVFile, "Curve", 15, "Hosts")
+  printTableFileHeader(tableIVFile, 15, []string{"Curve", "Hosts"},)
 
   for name, hosts := range curveCount {
-    printTableFilePercentage2(tableIVFile, name, 15, hosts, numECKE)
+    printTableFilePercentage(tableIVFile, 15, name, hosts, numECKE, nil)
   }
   _, err = tableIVFile.WriteString("\nTotal EC Key Exchange Servers: "+strconv.Itoa(numECKE))
   tableIVFile.Close()
 
 }
 
-func printWideTabletoFile(f *os.File, label string, data string) {
-  statement := fmt.Sprintf("%-26s\t%s\n", label , data)
-  _, err := f.WriteString(statement)
-  check(err)
-}
-
-func printTableFilePercentage2(f *os.File, label string, width int, data int, total int) {
-  per := float64(data)/float64(total)  * 100
-  format := fmt.Sprintf("%%-%ds\t%%d (%%s%%%%)\n", width)
-  statement := fmt.Sprintf(format, label , data, strconv.FormatFloat(per, 'f', 2, 64))
-  // statement := fmt.Sprintf("%-10s\t%d (%s%%)\n", label , data, strconv.FormatFloat(per, 'f', 2, 64))
-  _, err := f.WriteString(statement)
-  check(err)
-}
-
-func printTableFilePercentage(f *os.File, label string, data int, total int) {
-  per := float64(data)/float64(total)  * 100
-  // format := fmt.Sprintf("%%-%ds\t%%s\n", width)
-  // statement := fmt.Sprintf(format, label , data)
-  statement := fmt.Sprintf("%-10s\t%d (%s%%)\n", label , data, strconv.FormatFloat(per, 'f', 2, 64))
-  _, err := f.WriteString(statement)
-  check(err)
-}
-
-func printTableFileHeader2(f *os.File, label string, width int, data string) {
-  format := fmt.Sprintf("%%-%ds\t%%s\n", width)
-  statement := fmt.Sprintf(format, label , data)
-  _, err := f.WriteString(statement)
-  check(err)
-  _, err = f.WriteString("-------------------\n")
+func printTableFileHeader(f *os.File, width int, labels []string) {
+  printTableToFile(f, width, labels)
+  _, err := f.WriteString(strings.Repeat("-", width * len(labels)) + "\n")
   check(err)  
 }
 
-func printTableFileHeader(f *os.File, label string, data string) {
-  statement := fmt.Sprintf("%-10s\t%s\n", label , data)
-  _, err := f.WriteString(statement)
+func printTableToFile(f *os.File, width int, labels []string) {
+  cellFormat := fmt.Sprintf("%%-%ds\t", width)
+  var line string
+  for _, label := range labels {
+    line += fmt.Sprintf(cellFormat, label)
+  }
+  line += "\n"
+
+  _, err := f.WriteString(line)
   check(err)
-  _, err = f.WriteString("-------------------\n")
-  check(err)  
+}
+
+func printTableFilePercentage(f *os.File, width int, label string,  data int, total int, rest []string) {
+  per := float64(data)/float64(total)  * 100
+  initialformat := fmt.Sprintf("%%-%ds\t%%d (%%-%ds%%%%)\t", width, width)
+  line := fmt.Sprintf(initialformat, label , data, strconv.FormatFloat(per, 'f', 2, 64))
+
+  restFormat := fmt.Sprintf("%%-%ds\t", width)
+  for _, label := range rest {
+    line += fmt.Sprintf(restFormat, label)
+  }
+  line += "\n"
+  _, err := f.WriteString(line)
+  check(err)
+}
+
+func formatPercent(n int, total int) (string) {
+  per := float64(n)/float64(total)  * 100
+  return fmt.Sprintf("%d (%s%%)", n, strconv.FormatFloat(per, 'f', 2, 64))
 }
 
 func singleIntQuery(q string, db *sql.DB) (int) {
