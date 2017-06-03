@@ -14,6 +14,7 @@ import (
 
   "github.com/gonum/plot"
   "github.com/gonum/plot/plotter"
+  "github.com/gonum/plot/plotutil"
   "github.com/gonum/plot/vg"
 )
 
@@ -33,6 +34,8 @@ func analyze(dbName string) {
   printTableIII(db, numDHEEnabled, numTLSHosts)
   printTableIV(db)
   printTableVI(db)
+  sectionAnalysis(db)
+
 }
 
 func printTableI (db *sql.DB) (int) {
@@ -105,6 +108,7 @@ func printTableII_V (db *sql.DB, numEntries int) {
   ecAuthCountStr := formatPercent(count[6], numEntries)
 
   _, err = tableVFile.WriteString("Authentication method support on TLS servers\n")
+  check(err)
   printTableFileHeader(tableVFile, 14, []string{"Method", "Hosts", "HABJ'14", "IMC'07"})
 
   printTableToFile(tableVFile, 14, []string{"RSA", rsaAuthCountStr,"473,780 (99.9%)", "≥99.86%" } )
@@ -113,7 +117,7 @@ func printTableII_V (db *sql.DB, numEntries int) {
   printTableToFile(tableVFile, 14, []string{"ECDSA/ECDH", ecAuthCountStr,"3 (0.0%)" } )
 
   _, err = tableIIFile.WriteString("Total Hosts: " + strconv.Itoa(numEntries) + "\n")
-
+  check(err)
 }
 
 func printTableIII(db *sql.DB, numDHEEnabled int, numEntries int) {
@@ -261,7 +265,7 @@ func printMainGraph (db *sql.DB) {
 
   bemore, err := plotter.NewBubbles(keyexmore, vg.Points(3), vg.Points(20))
   check(err)
-  bemore.Color = color.RGBA{R: 255, G:200, B: 0, A: 255}
+  bemore.Color = color.RGBA{R: 255, G:255, B: 0, A: 255}
   p.Add(bemore)
 
   err = p.Save(9*vg.Inch, 9*vg.Inch, "mainResult.png")
@@ -328,8 +332,13 @@ func printTableIV (db *sql.DB) {
       keCurves = append(keCurves, curveName)
     }
   }
-
+  //add in keys for curves not found so previous results print in report
+  notFound := []string{"sect233r1", "secp521r1", "sect163r2", "secp224r1", "secp192r1"}
   curveCount := make(map[string]int)
+  for _, name := range notFound {
+    curveCount[name] = 0
+  }
+
   for _, name := range keCurves {
     curveCountQuery := fmt.Sprintf("select count (distinct host) from handshakes where keyexcurve is '%s'", name)
     curveCount[name] = singleIntQuery(curveCountQuery, db)
@@ -343,12 +352,43 @@ func printTableIV (db *sql.DB) {
   _, err = tableIVFile.WriteString("Elliptic curves used for ECDHE key exchange\n")
   printTableFileHeader(tableIVFile, 15, []string{"Curve", "Hosts"},)
   for name, hosts := range curveCount {
+    log.Println(name)
     resultStr := formatPercent(hosts, numECKE)
     transName, prevData := curveLookup(name)
     printTableToFile(tableIVFile, 15,  []string{transName, resultStr, prevData} )
   }
+
   _, err = tableIVFile.WriteString("\nTotal EC Key Exchange Servers: "+strconv.Itoa(numECKE))
   check(err)
+}
+
+func curveLookup (s string) (string, string) {
+  switch s{
+  case "P-256":
+    return "secp256r1", "81,789 (96.1%)"
+  case "P-384":
+    return "secp384r1", "86 (0.1%)"
+  case "P-521":
+    return "secp521r1", "73 (0.0%)"
+  case "B-571":
+    return "sect571r1", "316 (0.3%)"
+  case "brainpoolP512r1":
+    return "brainpoolP512r1", "0"
+  case "secp256k1":
+    return "secp256k1", "0"
+  case "sect233r1":
+    return "sect233r1", "3,123 (3.6%)"
+  case "secp521r1":
+    return "secp521r1", "73 (0.0%)"
+  case "sect163r2":
+    return "sect163r2", "26 (0.0%)"
+  case "secp224r1":
+    return "secp224r1", "3 (0.0%)"
+  case "secp192r1":
+    return "secp192r1", "1, (0.0%)"
+  default:
+    return "", ""
+  }
 }
 
 func printTableVI (db *sql.DB) {
@@ -396,24 +436,80 @@ func printTableVI (db *sql.DB) {
   printTableToFile(tableVIFile, 15,  []string{"≥ 4097", percentStr, "22 (0.0%)", "0.0%", "0.00%"} )
 }
 
-func curveLookup (s string) (string, string) {
-  switch s{
-  case "P-256":
-    return "secp256r1", "81,789 (96.1%)"
-  case "P-384":
-    return "secp384r1", "86 (0.1%)"
-  case "P-521":
-    return "secp521r1", "73 (0.0%)"
-  case "B-571":
-    return "sect571r1", "316 (0.3%)"
-  case "brainpoolP512r1":
-    return "brainpoolP512r1", "0"
-  case "secp256k1":
-    return "secp256k1", "0"
-  default:
-    return "", ""
-  }
+func sectionAnalysis (db *sql.DB) {
+
+  slicedMainGraph(db)
 }
+
+func slicedMainGraph (db *sql.DB) {
+    var badDHEArr, fwdSecretAddl, tlsAddlArr plotter.Values
+  for i:= 0; i < 10; i++ {
+    slicePredicate := fmt.Sprintf(" (host > %d and host <= %d)", i * 100000, (i+1) * 100000 )
+
+    // fmt.Println(slicePredicate)
+    totalHostQuery := "select count(distinct host) from handshakes where "
+    totalHosts := singleIntQuery(totalHostQuery + slicePredicate, db)
+    
+
+    forwardSecretQuery := "select count(distinct host) from handshakes where (keyexid = 28 or keyexid = 408) and"
+    forwardSecretHosts := singleIntQuery(forwardSecretQuery + slicePredicate, db)
+
+    badDHEParamQuery := `select count(distinct host) 
+                       from handshakes 
+                       where keyexid = 28 AND authid = 6 AND keyexbits < authbits and`
+    numBadDHEParam := singleIntQuery(badDHEParamQuery + slicePredicate, db)
+
+    //compute differences for 
+    badDHEArr = append(badDHEArr, float64(numBadDHEParam) )
+    fwdSecretAddl = append(fwdSecretAddl, float64( forwardSecretHosts - numBadDHEParam) )
+    tlsAddlArr = append(tlsAddlArr, float64(totalHosts - forwardSecretHosts) )
+
+    // fmt.Println(totalHosts)
+  }
+
+  p, err := plot.New()
+  check(err)
+  p.Title.Text = "Proportion of TLS, forward secrecy, and weak DHE over site popularity"
+  p.X.Label.Text = "Alexa popularity rank (in 100k)"
+  p.Y.Label.Text = "Hosts"
+
+  w := vg.Points(30)
+
+  badDHEBars, err := plotter.NewBarChart(badDHEArr, w)
+  check(err)
+  badDHEBars.LineStyle.Width = vg.Length(0)
+  badDHEBars.Color = plotutil.Color(0)
+
+  fwdSecretBars, err := plotter.NewBarChart(fwdSecretAddl, w)
+  check(err)
+  fwdSecretBars.LineStyle.Width = vg.Length(0)
+  fwdSecretBars.Color = plotutil.Color(1)
+  fwdSecretBars.StackOn(badDHEBars)
+
+  tlsBars, err := plotter.NewBarChart(tlsAddlArr, w)
+  check(err)
+  tlsBars.LineStyle.Width = vg.Length(0)
+  tlsBars.Color = plotutil.Color(2)
+  tlsBars.StackOn(fwdSecretBars)
+
+  p.Add(badDHEBars, fwdSecretBars, tlsBars)
+  p.Legend.Add("DHE param weaker than authentication key", badDHEBars)
+  p.Legend.Add("Support Forward Secrecy", fwdSecretBars)
+  p.Legend.Add("TLS clients not supporting Forward Secrecy", fwdSecretBars)
+  p.Legend.Top = true
+  p.Y.Max = 100000
+  p.X.Max = 10
+
+  var xLabels []string
+  for i := 0; i < 10 ; i++ {
+    xLabels = append(xLabels, fmt.Sprintf("%d to %d", i, i+1 )) 
+  }
+  p.NominalX(xLabels...)
+
+  err = p.Save(9*vg.Inch, 9*vg.Inch, "mainResultSliced.png")
+  check(err)
+}
+
 
 func printTableFileHeader(f *os.File, width int, labels []string) {
   printTableToFile(f, width, labels)
