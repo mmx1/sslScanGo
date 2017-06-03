@@ -45,4 +45,4 @@ rm -f scanDb.sqlite
 $GOPATH/bin/sslScanGo -populate
 $GOPATH/bin/sslScanGo -analyze
 
-sudo python -m simpleHTTPServer 80
+sudo python -m SimpleHTTPServer 80 &
