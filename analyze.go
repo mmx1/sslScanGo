@@ -637,18 +637,8 @@ func slicedAuthGraph (db *sql.DB) {
 
 func slicedDHEGraph (db *sql.DB) {
 
-  //Get Bit Sizes
-  rows, err := db.Query("select distinct keyexbits from handshakes where keyexid = 28")
-  check(err)
-  var dheBitSizes []int 
-  for rows.Next() {
-    var dheBitSize int
-    err = rows.Scan(&dheBitSize)
-    check(err)
-    dheBitSizes = append(dheBitSizes, dheBitSize)
-  }
-  rows.Close()
-  sort.Ints(dheBitSizes)
+  //Only perform for most common values
+  dheBitSizes := []int{1024, 2048, 4096}
 
 
   columns := make([]plotter.Values, len(dheBitSizes))
@@ -674,7 +664,8 @@ func slicedDHEGraph (db *sql.DB) {
     check(err)
     bars.LineStyle.Width = vg.Length(0)
     bars.Color = plotutil.Color(i)
-    offset := float64( (len(dheBitSizes) / 2) - i )
+    offset := float64( i - (len(dheBitSizes) / 2) )
+    fmt.Println(offset)
 
     bars.Offset = vg.Points(20 * offset )
 
