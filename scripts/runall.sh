@@ -10,9 +10,11 @@ trap 'handle_error $LINENO $?' ERR
 export GOPATH=$HOME/go
 
 scanner="github.com/mmx1/sslScanGo"
-currDir=$PWD
 
 go get -u $scanner
+
+rm -rf data
+rm -f scanDb.sqlite
 
 #read -p 'Enter File name ' filename
 #read -p 'Starting Index ' startInd
