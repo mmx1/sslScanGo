@@ -22,11 +22,10 @@ Requires OpenSSL >= 1.0.2 for SSL_get_server_tmp_key.
 
 Fetch Code
 ===========
-Run
 
     go get github.com/mmx1/sslScanGo
 
-to fetch the source and its dependencies.
+will fetch the source and its dependencies.
 
 This will take a few minutes to complete. 
 
@@ -35,16 +34,16 @@ Scripts
 
 The main script
 
-    scripts/runall.sh
+    $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runall.sh
 
 will run the entire dataset, and should take ~12 days. To examine a sample, run
 
-    scripts/runRand.sh
+    $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runRand.sh
 
 which will run 25,000 randomly selected from the top 1 million, should take ~ 8 hours.
 It is recommended that you spawn the task as follows:
 
-    scripts/runRand.sh > progress.txt & disown
+    $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runRand.sh > progress.txt & disown
 
 Disowning the process will allow you to safely logout, come back, and 
 inspect the tail of the progress file.
@@ -60,7 +59,7 @@ Which should finish in a few minutes.
 
 To just analyze our pre-scanned data without running your own scan, run
 
-    scripts/analyzeStatic.sh
+    $GOPATH/src/github.com/mmx1/sslScanGo/scripts/analyzeStatic.sh
 
 will extract the archived scan outputs from archive.tar, and run the populator
 and analyzer. This will take approximately 30 minutes. The extraction will
@@ -86,6 +85,7 @@ The default for sslScanGo is to run the scanner on the entire top-1m.csv
 file.
 
 Run the database conversion with: 
+
     $GOPATH/bin/sslScanGo -populate
 
 This will read from ./data/ and output ./scanDb.sqlite in the folder where
@@ -113,4 +113,7 @@ executes the query code and outputs  files:
   7) TableV.txt => Enumerating authentication algorithms
   8) TableVI.txt => Enumerating authentication key strengths
 
-
+VM
+==
+For a limited time, a virtual machine (OVA format) is also available with credentials cs244:
+http://web.stanford.edu/~markxue/cs244-vm-15.10.ova
