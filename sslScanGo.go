@@ -184,7 +184,7 @@ func (o *sslCheckOptions) testProtocolCipher (cipherName string, tlsVersion open
   check(err)
 
   o.rateLimit()
-  conn, err := openssl.Dial("tcp", o.host, context, 0)
+  conn, err := openssl.DialTimeout("tcp", o.host, context, 0, time.Duration(30)*time.Second)
 
   if err != nil {
     //inspect for weak dh key

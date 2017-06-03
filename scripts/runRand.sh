@@ -11,8 +11,7 @@ export GOPATH=$HOME/go
 scanner="github.com/mmx1/sslScanGo"
 currDir=$PWD
 
-rm -rf $GOPATH/src/$scanner
-go get $scanner && go install $scanner
+go get -u $scanner
 
 #read -p 'Enter File name ' filename
 #read -p 'Starting Index ' startInd
