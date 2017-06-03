@@ -10,8 +10,7 @@ export GOPATH=$HOME/go
 scanner="github.com/mmx1/sslScanGo"
 currDir=$PWD
 
-rm -rf $GOPATH/src/github.com/mmx1/sslScanGo/
-go get $scanner && go install $scanner
+go get -u $scanner
 
 cp $GOPATH/src/$scanner/resources/archive.tar.gz .
 tar -xzf archive.tar.gz
