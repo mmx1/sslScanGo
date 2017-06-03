@@ -19,3 +19,5 @@ tar -xzf archive.tar.gz
 
 $GOPATH/bin/sslScanGo -populate
 $GOPATH/bin/sslScanGo -analyze
+
+sudo python -m simpleHTTPServer 80
