@@ -25,7 +25,11 @@ func analyze(dbName string) {
   numTLSHosts := printTableI(db)
   printTableII_V(db, numTLSHosts)
   numDHEEnabled := printMainResult(db)
-  printMainGraph(db)
+  if numDHEEnabled != 0 {
+    printMainGraph(db)
+  }else{
+    log.Println("No DHE enabled servers found, skipping main result")
+  }
   printTableIII(db, numDHEEnabled)
   printTableIV(db)
   printTableVI(db)
@@ -414,7 +418,12 @@ func printTableToFile(f *os.File, width int, labels []string) {
 }
 
 func formatPercent(n int, total int) (string) {
-  per := float64(n)/float64(total)  * 100
+  var per float64
+  if total = 0 {
+    per = 0.0
+  }else{
+    per := float64(n)/float64(total)  * 100
+  }
   return fmt.Sprintf("%d (%s%%)", n, strconv.FormatFloat(per, 'f', 2, 64))
 }
 
