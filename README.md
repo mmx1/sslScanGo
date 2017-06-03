@@ -3,25 +3,9 @@ SSL Scan
 
 This is a lightweight ssl scanner based on https://github.com/rbsec/sslscan. 
 
-Setup
-=====
-Setup your `$GOPATH`, then run
-
-    go get github.com/mmx1/sslScanGo
-
-Build with 
-
-    go install github.com/mmx1/sslScanGo
-
-
-And run:
-
-    $GOPATH/bin/sslScanGo
-
 Dependencies
 ============
 
-    //Ubuntu
     sudo apt-get install libssl-dev golang sqlite3 mercurial
     export GOPATH=$HOME/go
 
@@ -32,6 +16,20 @@ Testing performed with OpenSSL 1.0.2g and go 1.7.4 on Ubuntu 17.04.
 Known issues with go 1.2
 Requires OpenSSL >= 1.0.2 for SSL_get_server_tmp_key.
 
+Usage
+=====
+Run
+
+    go get github.com/mmx1/sslScanGo
+
+to fetch the source and its dependencies, then build with 
+
+    go install github.com/mmx1/sslScanGo
+
+
+And run:
+
+    $GOPATH/bin/sslScanGo
 
 Run the database conversion with: 
     $GOPATH/bin/sslScanGo -populate
@@ -48,13 +46,17 @@ To run the queries on the database:
 
     $GOPATH/bin/sslScanGo -analyze
 
-executes the query code and outputs 3 files:
+executes the query code and outputs  files:
   1) BigResult.txt => main result of the paper comparing hosts that utilize
       DHE key exchange for the TLS handshake with the number of hosts that
       utilize weak DHE parameters (i.e. keyexchange bits < authentication
       key bits)
-  2) TableI.txt => List of errors from querying the domains
-  3) TableII.txt => What the hosts utilize for key exchange (RSA, DHE, ECDHE)
-  4) TableIII.txt => Number of hosts for each key size of DHE
+  2) mainResult.png => plot of key exchange key strength vs authentication key strength
+  3) TableI.txt => List of errors from querying the domains
+  4) TableII.txt => What the hosts utilize for key exchange (RSA, DHE, ECDHE)
+  5) TableIII.txt => Number of hosts for each key size of DHE
+  6) TableIV.txt => Enumerating the curves used for EC key exchange suites
+  7) TableV.txt => Enumerating authentication algorithms
+  8) TableVI.txt => Enumerating authentication key strengths
 
 
