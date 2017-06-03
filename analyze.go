@@ -419,7 +419,7 @@ func printTableToFile(f *os.File, width int, labels []string) {
 
 func formatPercent(n int, total int) (string) {
   var per float64
-  if total = 0 {
+  if total == 0 {
     per = 0.0
   }else{
     per := float64(n)/float64(total)  * 100
