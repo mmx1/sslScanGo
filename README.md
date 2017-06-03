@@ -64,7 +64,7 @@ To just analyze our pre-scanned data without running your own scan, run
 
 will extract the archived scan outputs from archive.tar, and run the populator
 and analyzer. This will take approximately 30 minutes. The extraction will
-take a few minuts and show no progress, but the populator will report
+take a few minutes and show no progress, but the populator will report
 every 10,000 rows filled.
 WARNING: You should not run this script in a directory
 or one monitored by a cloud service such as Dropbox or iCloud Drive, it
