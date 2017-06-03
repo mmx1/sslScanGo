@@ -24,22 +24,20 @@ func analyze(dbName string) {
 
   numTLSHosts := printTableI(db)
   printTableII_V(db, numTLSHosts)
-  numDHEEnabled := printMainResult(db)
+  numDHEEnabled := printMainResult(db, numTLSHosts)
   if numDHEEnabled != 0 {
     printMainGraph(db)
   }else{
     log.Println("No DHE enabled servers found, skipping main result")
   }
-  printTableIII(db, numDHEEnabled)
+  printTableIII(db, numDHEEnabled, numTLSHosts)
   printTableIV(db)
   printTableVI(db)
 }
 
 func printTableI (db *sql.DB) (int) {
     //Table I : Errors
-  var numTLSHosts int
-  err := db.QueryRow("select count(distinct host) from handshakes").Scan(&numTLSHosts)
-  check(err)
+  numTLSHosts := singleIntQuery("select count(distinct host) from handshakes", db)
 
   connRefusedCnt := queryNumError(db, 1)
   sslErrCnt := queryNumError(db, 2)
@@ -114,10 +112,13 @@ func printTableII_V (db *sql.DB, numEntries int) {
   printTableToFile(tableVFile, 14, []string{"DSA", dsaCountStr,"22 (0.0%)" } )
   printTableToFile(tableVFile, 14, []string{"ECDSA/ECDH", ecAuthCountStr,"3 (0.0%)" } )
 
+  _, err = tableIIFile.WriteString("Total Hosts: " + strconv.Itoa(numEntries) + "\n")
+
 }
 
-func printTableIII(db *sql.DB, numDHEEnabled int) {
+func printTableIII(db *sql.DB, numDHEEnabled int, numEntries int) {
   //TABLE III CODE
+
   //Get Bit Sizes
   rows, err := db.Query("select distinct keyexbits from handshakes where keyexid = 28")
   check(err)
@@ -149,6 +150,7 @@ func printTableIII(db *sql.DB, numDHEEnabled int) {
   defer tableIIIFile.Close()
 
   _, err = tableIIIFile.WriteString("Diffie-Hellman parameter size support for DHE key exchange\n")
+  check(err)
   printTableFileHeader(tableIIIFile, 14, []string{"Size(bits)", "Hosts", "HABJ'14"})
   lowDheStr := formatPercent(lowDHE, numDHEEnabled)
   printTableToFile(tableIIIFile, 14, []string{"≤768",lowDheStr, "97,494 (34.3%)" })
@@ -157,8 +159,9 @@ func printTableIII(db *sql.DB, numDHEEnabled int) {
     currDataStr := formatPercent(m[bitSz], numDHEEnabled)
     printTableToFile(tableIIIFile, 14, []string{strconv.Itoa(bitSz), currDataStr, prevDHSizeData(bitSz)} )
   }
+
   _, err = tableIIIFile.WriteString("\nTotal DHE Enabled Servers: " + strconv.Itoa(numDHEEnabled))
-  tableIIIFile.Close()
+  check(err)
 }
 
 func prevDHSizeData (size int) (string) {
@@ -178,7 +181,9 @@ func prevDHSizeData (size int) (string) {
   }
 }
 
-func printMainResult (db *sql.DB) (int) {
+func printMainResult (db *sql.DB, numEntries int) (int) {
+  forwardSecretHosts := singleIntQuery("select count(distinct host) from handshakes where keyexid = 28 or keyexid = 408", db)
+
   numDHEQuery := "select count(distinct host) from handshakes where keyexid = 28"
   numDHEEnabled := singleIntQuery(numDHEQuery, db)
   log.Println("Total DHE enabled: ", numDHEEnabled)
@@ -203,11 +208,22 @@ func printMainResult (db *sql.DB) (int) {
   brFile, err := os.Create("BigResult.txt")
   check(err)
 
+  forwardSecretPercent := formatPercent(forwardSecretHosts, numEntries)
   badPercentage :=  formatPercent(numBadDHEParam, numDHEEnabled) 
-  _, err = brFile.WriteString("Hosts using weaker DH Parameters than Authentication Key strength\n")
+  _, err = brFile.WriteString("Forward Secrecy Statistics\n")
+  check(err)
+
   printTableFileHeader(brFile, 20, []string{"", "2017",  "HABJ'14"})
+  printTableToFile(brFile, 20, []string{"Forward Secret Hosts", forwardSecretPercent, ">74%"} )
+  _, err = brFile.WriteString("Total TLS Hosts: " + strconv.Itoa(numEntries) + "\n")
+  check(err)
+
+  _, err = brFile.WriteString("\n")
+  check(err)
+
   printTableToFile(brFile, 20, []string{"Weak DH Parameters", badPercentage, "82.9%"} )
   printTableToFile(brFile, 20, []string{"Total DHE hosts", strconv.Itoa(numDHEEnabled), "283,647"} )
+
 
   brFile.Close()
 
@@ -302,6 +318,7 @@ func printTableIV (db *sql.DB) {
 
   curveRows, err := db.Query("select distinct keyexcurve from handshakes")
   check(err)
+  defer curveRows.Close()
   var keCurves []string 
   for curveRows.Next() {
     var curveName string
@@ -311,7 +328,6 @@ func printTableIV (db *sql.DB) {
       keCurves = append(keCurves, curveName)
     }
   }
-  curveRows.Close()
 
   curveCount := make(map[string]int)
   for _, name := range keCurves {
