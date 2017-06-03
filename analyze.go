@@ -352,7 +352,6 @@ func printTableIV (db *sql.DB) {
   _, err = tableIVFile.WriteString("Elliptic curves used for ECDHE key exchange\n")
   printTableFileHeader(tableIVFile, 15, []string{"Curve", "Hosts"},)
   for name, hosts := range curveCount {
-    log.Println(name)
     resultStr := formatPercent(hosts, numECKE)
     transName, prevData := curveLookup(name)
     printTableToFile(tableIVFile, 15,  []string{transName, resultStr, prevData} )
@@ -437,8 +436,10 @@ func printTableVI (db *sql.DB) {
 }
 
 func sectionAnalysis (db *sql.DB) {
-
   slicedMainGraph(db)
+  slicedKEGraph(db)
+  slicedAuthGraph(db)
+  slicedDHEGraph(db)
 }
 
 func slicedMainGraph (db *sql.DB) {
@@ -507,6 +508,190 @@ func slicedMainGraph (db *sql.DB) {
   p.NominalX(xLabels...)
 
   err = p.Save(9*vg.Inch, 9*vg.Inch, "mainResultSliced.png")
+  check(err)
+}
+
+func slicedKEGraph (db *sql.DB) {
+  //used to just get the list of Key Exchange messages (columns of a single row) 
+  rows, err := db.Query("select * from hosts where id=1")
+  columns, err := rows.Columns()
+  check(err)
+  rows.Close()
+
+  var rsaArr, dheArr, ecArr plotter.Values
+  for i:= 0; i < 10; i++ {
+
+
+    slicePredicate := fmt.Sprintf(" (id > %d and id <= %d)", i * 100000, (i+1) * 100000 )
+    
+    rsaQuery := fmt.Sprintf("select count(*) from hosts where %s= 1 and ", columns[3])
+    rsaHosts := singleIntQuery(rsaQuery + slicePredicate, db)
+    rsaArr = append(rsaArr, float64(rsaHosts))
+    
+    dhQuery := fmt.Sprintf("select count(*) from hosts where %s= 1 and ", columns[4])
+    dhHosts := singleIntQuery(dhQuery + slicePredicate, db)
+    dheArr = append(dheArr, float64(dhHosts))
+
+    ecQuery := fmt.Sprintf("select count(*) from hosts where %s= 1 and ", columns[5])
+    ecHosts := singleIntQuery(ecQuery + slicePredicate, db)
+    ecArr = append(ecArr, float64(ecHosts))
+  }
+
+  p, err := plot.New()
+  check(err)
+  p.Title.Text = "Supported Key Exchange protocols across site popularity"
+  p.X.Label.Text = "Alexa popularity rank (in 100k)"
+  p.Y.Label.Text = "Hosts"
+
+  w := vg.Points(15)
+
+  rsaBars, err := plotter.NewBarChart(rsaArr, w)
+  check(err)
+  rsaBars.LineStyle.Width = vg.Length(0)
+  rsaBars.Color = plotutil.Color(0)
+  rsaBars.Offset = -w
+
+  dheBars, err := plotter.NewBarChart(dheArr, w)
+  check(err)
+  dheBars.LineStyle.Width = vg.Length(0)
+  dheBars.Color = plotutil.Color(1)
+  dheBars.Offset = 0
+
+  ecBars, err := plotter.NewBarChart(ecArr, w)
+  check(err)
+  ecBars.LineStyle.Width = vg.Length(0)
+  ecBars.Color = plotutil.Color(2)
+  ecBars.Offset = w
+
+  p.Add(rsaBars, dheBars, ecBars)
+  p.Legend.Add("RSA", rsaBars)
+  p.Legend.Add("DHE", dheBars)
+  p.Legend.Add("ECDHE", ecBars)
+  p.Legend.Top = true
+  p.Y.Max = 100000
+
+  var xLabels []string
+  for i := 0; i < 10 ; i++ {
+    xLabels = append(xLabels, fmt.Sprintf("%d to %d", i, i+1 )) 
+  }
+  p.NominalX(xLabels...)
+
+  err = p.Save(9*vg.Inch, 9*vg.Inch, "keyExchangeSliced.png")
+  check(err)
+}
+
+func slicedAuthGraph (db *sql.DB) {
+  rows, err := db.Query("select * from hosts where id=1")
+  columns, err := rows.Columns()
+  check(err)
+  rows.Close()
+
+  var rsaArr, ecArr plotter.Values
+  for i:= 0; i < 10; i++ {
+    slicePredicate := fmt.Sprintf(" (id > %d and id <= %d)", i * 100000, (i+1) * 100000 )
+    
+    rsaQuery := fmt.Sprintf("select count(*) from hosts where %s= 1 and ", columns[6])
+    rsaHosts := singleIntQuery(rsaQuery + slicePredicate, db)
+    rsaArr = append(rsaArr, float64(rsaHosts))
+
+    ecQuery := fmt.Sprintf("select count(*) from hosts where %s= 1 and ", columns[9])
+    ecHosts := singleIntQuery(ecQuery + slicePredicate, db)
+    ecArr = append(ecArr, float64(ecHosts))
+  }
+
+  p, err := plot.New()
+  check(err)
+  p.Title.Text = "Supported Authentication protocols across site popularity"
+  p.X.Label.Text = "Alexa popularity rank (in 100k)"
+  p.Y.Label.Text = "Hosts"
+
+  w := vg.Points(20)
+
+  rsaBars, err := plotter.NewBarChart(rsaArr, w)
+  check(err)
+  rsaBars.LineStyle.Width = vg.Length(0)
+  rsaBars.Color = plotutil.Color(0)
+  rsaBars.Offset = -w
+
+  ecBars, err := plotter.NewBarChart(ecArr, w)
+  check(err)
+  ecBars.LineStyle.Width = vg.Length(0)
+  ecBars.Color = plotutil.Color(2)
+  ecBars.Offset = 0
+
+  p.Add(rsaBars, ecBars)
+  p.Legend.Add("RSA", rsaBars)
+  p.Legend.Add("ECDSA", ecBars)
+  p.Legend.Top = true
+  p.Y.Max = 100000
+
+  var xLabels []string
+  for i := 0; i < 10 ; i++ {
+    xLabels = append(xLabels, fmt.Sprintf("%d to %d", i, i+1 )) 
+  }
+  p.NominalX(xLabels...)
+
+  err = p.Save(9*vg.Inch, 9*vg.Inch, "authenticationSliced.png")
+  check(err)
+}
+
+func slicedDHEGraph (db *sql.DB) {
+
+  //Get Bit Sizes
+  rows, err := db.Query("select distinct keyexbits from handshakes where keyexid = 28")
+  check(err)
+  var dheBitSizes []int 
+  for rows.Next() {
+    var dheBitSize int
+    err = rows.Scan(&dheBitSize)
+    check(err)
+    dheBitSizes = append(dheBitSizes, dheBitSize)
+  }
+  rows.Close()
+  sort.Ints(dheBitSizes)
+
+
+  columns := make([]plotter.Values, len(dheBitSizes))
+  for i:= 0; i < 10; i++ {
+    slicePredicate := fmt.Sprintf(" (id > %d and id <= %d)", i * 100000, (i+1) * 100000 )    
+    for j, size := range dheBitSizes{
+      format := "select count(distinct host) from handshakes where keyexid = 28 and keyexbits = %d and "
+      query := fmt.Sprintf(format, int(size))
+      count := singleIntQuery(query + slicePredicate, db)
+      columns[j] = append(columns[j], float64(count) )
+    }
+  }
+
+  p, err := plot.New()
+  check(err)
+  p.Title.Text = "DH parameter size across site popularity"
+  p.X.Label.Text = "Alexa popularity rank (in 100k)"
+  p.Y.Label.Text = "Hosts"
+
+  w := vg.Points(20)
+  for i ,size := range dheBitSizes {
+    bars, err := plotter.NewBarChart(columns[i], w)
+    check(err)
+    bars.LineStyle.Width = vg.Length(0)
+    bars.Color = plotutil.Color(i)
+    offset := float64( (len(dheBitSizes) / 2) - i )
+
+    bars.Offset = vg.Points(20 * offset )
+
+    p.Legend.Add(fmt.Sprintf("%d", size), bars)
+
+    p.Add(bars)
+  }
+
+  p.Legend.Top = true
+
+  var xLabels []string
+  for i := 0; i < 10 ; i++ {
+    xLabels = append(xLabels, fmt.Sprintf("%d to %d", i, i+1 )) 
+  }
+  p.NominalX(xLabels...)
+
+  err = p.Save(9*vg.Inch, 9*vg.Inch, "dheKeySliced.png")
   check(err)
 }
 
