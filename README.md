@@ -86,6 +86,7 @@ The default for sslScanGo is to run the scanner on the entire top-1m.csv
 file.
 
 Run the database conversion with: 
+
     $GOPATH/bin/sslScanGo -populate
 
 This will read from ./data/ and output ./scanDb.sqlite in the folder where
