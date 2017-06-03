@@ -422,7 +422,7 @@ func formatPercent(n int, total int) (string) {
   if total == 0 {
     per = 0.0
   }else{
-    per := float64(n)/float64(total)  * 100
+    per = float64(n)/float64(total)  * 100
   }
   return fmt.Sprintf("%d (%s%%)", n, strconv.FormatFloat(per, 'f', 2, 64))
 }
