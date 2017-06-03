@@ -22,11 +22,10 @@ Requires OpenSSL >= 1.0.2 for SSL_get_server_tmp_key.
 
 Fetch Code
 ===========
-Run
 
     go get github.com/mmx1/sslScanGo
 
-to fetch the source and its dependencies.
+will fetch the source and its dependencies.
 
 This will take a few minutes to complete. 
 
@@ -114,4 +113,7 @@ executes the query code and outputs  files:
   7) TableV.txt => Enumerating authentication algorithms
   8) TableVI.txt => Enumerating authentication key strengths
 
-
+VM
+==
+For a limited time, a virtual machine (OVA format) is also available with credentials cs244:
+http://web.stanford.edu/~markxue/cs244-vm-15.10.ova

@@ -643,7 +643,7 @@ func slicedDHEGraph (db *sql.DB) {
 
   columns := make([]plotter.Values, len(dheBitSizes))
   for i:= 0; i < 10; i++ {
-    slicePredicate := fmt.Sprintf(" (id > %d and id <= %d)", i * 100000, (i+1) * 100000 )    
+    slicePredicate := fmt.Sprintf(" (host > %d and host <= %d)", i * 100000, (i+1) * 100000 )    
     for j, size := range dheBitSizes{
       format := "select count(distinct host) from handshakes where keyexid = 28 and keyexbits = %d and "
       query := fmt.Sprintf(format, int(size))
