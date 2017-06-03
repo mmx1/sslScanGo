@@ -272,9 +272,13 @@ func (o *sslCheckOptions) testProtocolCiphers (tlsVersion openssl.SSLVersion) {
     //fmt.Print(dheCipher)
     cipher := o.testProtocolCipher(cipherList, tlsVersion)
     if cipher != "" {
+      if strings.Contains(cipherList, cipher){
+        log.Println("Mis-Configured server:", o.host)
+        break
+      }
       cipherList += ":!" + cipher
     }else{
-      break;
+      break
     }
   }
 

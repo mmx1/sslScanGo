@@ -20,6 +20,16 @@ Testing performed with OpenSSL 1.0.2g and go 1.7.4 on Ubuntu 17.04.
 Known issues with go 1.2
 Requires OpenSSL >= 1.0.2 for SSL_get_server_tmp_key.
 
+Fetch Code
+===========
+Run
+
+    go get github.com/mmx1/sslScanGo
+
+to fetch the source and its dependencies.
+
+This will take a few minutes to complete. 
+
 Scripts
 ====
 
@@ -34,10 +44,12 @@ will run the entire dataset, and should take ~12 days. To examine a sample, run
 which will run 25,000 randomly selected from the top 1 million, should take ~ 8 hours.
 It is recommended that you spawn the task as follows:
 
-    scripts/runRand.sh > progress.txt &
+    scripts/runRand.sh > progress.txt & disown
 
-and disown the process id. You can then safely log out, come back, and 
+Disowning the process will allow you to safely logout, come back, and 
 inspect the tail of the progress file.
+
+    tail -f output.txt
 
 The script may hang on a few outstanding hosts. If so, you can kill the scanner
 and manually trigger the populator and analyzer:
@@ -64,14 +76,14 @@ Run
 
     go get github.com/mmx1/sslScanGo
 
-to fetch the source and its dependencies, then build with 
-
-    go install github.com/mmx1/sslScanGo
-
+to fetch the source and its dependencies.
 
 And run:
 
     $GOPATH/bin/sslScanGo
+
+The default for sslScanGo is to run the scanner on the entire top-1m.csv 
+file.
 
 Run the database conversion with: 
     $GOPATH/bin/sslScanGo -populate
