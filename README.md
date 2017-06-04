@@ -11,10 +11,13 @@ home network or farmshare.
 Create a VM Instance in Google Cloud
 ====================================
 Ubuntu 17.04 
-CPU 3.75
-Hard disk 20 GB => will not work with a smaller disk
 
-SSH into the VM and run code below. 
+1 vCPU, 3.75GB RAM
+
+20 GB required to run full 1 million host analysis or static analysis
+of prescanned archive
+
+10GB default sufficient for random subsample run of up to 500,000 hosts
 
 Dependencies
 ============
@@ -23,18 +26,17 @@ This requires the following libraries (and for $GOPATH to be set)
     sudo apt-get install libssl-dev golang sqlite3 mercurial
     export GOPATH=$HOME/go
 
-This has been confirmed to work with OpenSSL 1.0.2d and go 1.5.1 on Ubuntu 15.10. 
-Testing performed with OpenSSL 1.0.2g and go 1.7.4 on Ubuntu 17.04. 
-Known issues with go 1.2
-Requires OpenSSL >= 1.0.2 for SSL_get_server_tmp_key.
+This has been confirmed to work with OpenSSL 1.0.2d and Go 1.5.1 on Ubuntu 15.10. 
+Testing performed with OpenSSL 1.0.2g and Go 1.7.4 on Ubuntu 17.04. 
+Known issues with Go < 1.2
+Requires OpenSSL >= 1.0.2 (for SSL_get_server_tmp_key).
 
 Fetch Code
 ===========
 
     go get github.com/mmx1/sslScanGo
 
-will fetch the source and its dependencies. This will take approximately 
-6 seconds to complete depending on your network connection. 
+will fetch the source and its dependencies.
 
 Scripts
 =========
@@ -83,7 +85,7 @@ Recommend only running 1 & 2 for reproducing the results:
 
         tail -f output.txt
 
-* The script may hang on a few outstanding hosts. If so, you can kill the scanner 
+* When complete, the script may hang on a few outstanding hosts. If so, you can kill the scanner 
     and manually trigger the populator and analyzer:
 
         $GOPATH/bin/sslScanGo -populate && $GOPATH/bin/sslScanGo -analyze
