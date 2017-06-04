@@ -54,7 +54,14 @@ and manually trigger the populator and analyzer:
 
     $GOPATH/bin/sslScanGo -populate && $GOPATH/bin/sslScanGo -analyze
 
-Which should finish in a few minutes.
+Which will finish in about 2 minutes.
+To view the results:
+    
+    sudo python -m SimpleHTTPServer 80
+
+View by going to:
+
+    http://externalIPAddress
 
 To just analyze our pre-scanned data without running your own scan, run
 
