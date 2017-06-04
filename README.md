@@ -39,9 +39,9 @@ will fetch the source and its dependencies. This will take approximately
 Scripts
 =========
 Three Main Scripts: 
-1) runall.sh
+1) analyzeStatic.sh
 2) runRand.sh
-3) analyzeStatic.sh
+3) runall.sh
 
 Overview:
 Each script will populate a database with the data and analyze the data
@@ -49,18 +49,18 @@ by creating output files for each main result from the paper (HABJ). After
 creating the output files, the script will initiate a HTTP server on port 80.
 Use the VM's external facing IP address to access the files.
 
-Differences:
-1) runall.sh -> will collect all the data from the top 1 million websites, 
-  which is used to create the results in the blog post. This data is archived 
-  for use with analyzeStatic.sh. This script will take 12 DAYS. 
-2) runRand.sh -> same as runall except will only create a 20000 random sample
-  of the 1 million websites. This script takes 8 hours.
-3) analyzeStatic.sh -> will not make any queries but will utilize our archived
+Differences: 
+1) analyzeStatic.sh -> will not make any queries but will utilize our archived
   data we captured to create our blog post, so you can see the same results.
   This script takes about 30 minutes.
+2) runRand.sh -> collects data from a 20000 domain random sample of the 1 million websites. 
+    This script is meant to show a representation of the work in a reasonable amount
+    of time. This script takes 8 hours.
+3) runall.sh -> collectss data from the top 1 million websites, 
+  which is used to create the results in the blog post. This data is archived 
+  for use with analyzeStatic.sh. This script will take 12 DAYS.
 
-
-Recommendation for reproducing results:
+Recommend only running 1 & 2 for reproducing the results:
   
 1) Run script analyzeStatic.sh to see results in blog post. (30 min)
 
