@@ -243,9 +243,8 @@ func printMainGraph (db *sql.DB) {
   check(err)
   defer dropTable("graph_output", db)
 
-  keEquals := tupleQuery("keyexbits = authbits", db)
-  keyexless := tupleQuery("keyexbits < authbits", db)
-  keyexmore := tupleQuery("keyexbits > authbits", db)
+  keMoreEquals := tupleQuery("keyexbits >= authbits", db)
+  keyExless := tupleQuery("keyexbits < authbits", db)
 
   p, err := plot.New()
   check(err)
@@ -253,20 +252,19 @@ func printMainGraph (db *sql.DB) {
   p.X.Label.Text = "RSA key size (bits)"
   p.Y.Label.Text = "DH parameter size (bits)"
 
-  bequals, err := plotter.NewBubbles(keEquals, vg.Points(3), vg.Points(20))
-  check(err)
-  bequals.Color = color.RGBA{R: 0, G:255, B: 0, A: 255}
-  p.Add(bequals)
+  if len(keMoreEquals) > 0 {
+    bequals, err := plotter.NewBubbles(keMoreEquals, vg.Points(3), vg.Points(20))
+    check(err)
+    bequals.Color = color.RGBA{R: 0, G:255, B: 0, A: 255}
+    p.Add(bequals)
+  }
 
-  beless, err := plotter.NewBubbles(keyexless, vg.Points(3), vg.Points(20))
-  check(err)
-  beless.Color = color.RGBA{R: 255, G:100, B: 0, A: 255}
-  p.Add(beless)
-
-  bemore, err := plotter.NewBubbles(keyexmore, vg.Points(3), vg.Points(20))
-  check(err)
-  bemore.Color = color.RGBA{R: 0, G:255, B: 0, A: 255}
-  p.Add(bemore)
+  if len(keyExless) > 0 {
+    beless, err := plotter.NewBubbles(keyExless, vg.Points(3), vg.Points(20))
+    check(err)
+    beless.Color = color.RGBA{R: 255, G:100, B: 0, A: 255}
+    p.Add(beless)
+  }
 
   err = p.Save(9*vg.Inch, 9*vg.Inch, "mainResult.png")
   check(err)

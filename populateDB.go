@@ -7,6 +7,7 @@ import (
   "io/ioutil"
   "log"
   "os"
+  "strings"
 )
 
 func populateDb (dataDir string, outputName string) {
@@ -65,9 +66,12 @@ func populateDb (dataDir string, outputName string) {
 
   //kick off thread to fill resultChan and close when done
   go func () {
+    log.Printf("Populate progress report may start from 1000000 due to skipped hidden metadata files")
     for i , f := range files {
-      if f.Name() == "." {
-        log.Println("**** FOUND CURRENT DIR *****")
+
+      //resolve bug with macOS metadatafiles ".*"
+      if strings.HasPrefix(f.Name(), ".") {
+        continue
       }
 
       if i % 10000 == 0 {
