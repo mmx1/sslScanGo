@@ -61,6 +61,7 @@ func populateDb (dataDir string, outputName string) {
   check(err)
 
   resultChan := make(chan ScanResult, 100)
+  oldResultChan := make(chan ScanResultOld, 100)
 
   //kick off thread to fill resultChan and close when done
   go func () {
@@ -78,19 +79,26 @@ func populateDb (dataDir string, outputName string) {
         log.Printf("Error reading file %s: %s \n", f, err)
         continue
       }
-      //defer file.Close()
 
       decoder := json.NewDecoder(file)
-      var result ScanResult
-      err = decoder.Decode(&result)
-      file.Close()
-      if err != nil {
-        log.Printf("Error reading json in file %s: %s \n", f, err)
-        continue
+
+      var oldResult ScanResultOld
+      err = decoder.Decode(&oldResult)
+      
+      if err == nil {
+        oldResultChan <- oldResult
+      }else {
+        var result ScanResult
+        err = decoder.Decode(&result)
+        if err == nil {
+          resultChan <- result
+        }else{
+          log.Printf("Error reading json in file %s: %s \n", f, err)
+        }
       }
-      //log.Println(f, result)
-      resultChan <- result
+      file.Close()
     }
+    close(oldResultChan)
     close(resultChan)
   }()
     
@@ -112,6 +120,45 @@ func populateDb (dataDir string, outputName string) {
     //batch up to 10 results
     for i := 0 ; i < 10 ; i++ {
       select {
+      case result, more := <- oldResultChan:
+        done = !more
+        if done {
+          break;
+        }
+
+        errorMask := 0
+        //make into a bitmask
+        foundM := make (map[uint]bool)
+        for _ , element := range result.Error {
+          if !foundM[uint(element)]{
+            errorMask += 1 << uint(element)
+          }
+          foundM[uint(element)]=true
+        }
+        _, err = insertHostStmt.Exec( result.Id, 
+                          errorMask, 
+                          (result.KeyExchangeMethods & 1) != 0,  
+                          (result.KeyExchangeMethods & 2) != 0,
+                          (result.KeyExchangeMethods & 4) != 0,
+                          (result.AuthMethods & 1) != 0,
+                          (result.AuthMethods & 2) != 0,
+                          (result.AuthMethods & 4) != 0,
+                          (result.AuthMethods & 8) != 0,
+                          result.Comments )
+        check(err)
+
+        for _, handshake := range result.Handshakes {
+          _, err = insertHandshakeStmt.Exec ( result.Id,
+                                              handshake.Cipher,
+                                              handshake.Protocol,
+                                              handshake.KeyExchangeID,
+                                              handshake.KeyExchangeBits,
+                                              handshake.KeyExchangeCurve,
+                                              handshake.AuthKeyId,
+                                              handshake.AuthKeyBits,
+                                              handshake.AuthKeyCurve )
+          check(err)
+        }
       case result, more := <- resultChan:
         done = !more
         if done {

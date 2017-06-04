@@ -97,3 +97,25 @@ func (o *sslCheckOptions) print(fileName string) {
   encoder := json.NewEncoder(outputFile)
   err = encoder.Encode(&o.result)
 }
+
+//added for backwards compatibility with old collected data
+type HandShakeResultOld struct {
+  Cipher string
+  Protocol openssl.SSLVersion
+  KeyExchangeID int
+  KeyExchangeBits int
+  KeyExchangeCurve string //don't hard-code curve names and ask directly from OpenSSL
+  AuthKeyId int
+  AuthKeyBits int
+  AuthKeyCurve string
+}
+
+type ScanResultOld struct{
+  Id int
+  Error []ConnectionError
+  KeyExchangeMethods KeyExchangeMethod
+  AuthMethods AuthMethod
+  Handshakes []HandShakeResultOld
+  Timestamp time.Time
+  Comments string //drop exceptions in here to filter later
+}
