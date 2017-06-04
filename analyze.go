@@ -265,7 +265,7 @@ func printMainGraph (db *sql.DB) {
 
   bemore, err := plotter.NewBubbles(keyexmore, vg.Points(3), vg.Points(20))
   check(err)
-  bemore.Color = color.RGBA{R: 255, G:255, B: 0, A: 255}
+  bemore.Color = color.RGBA{R: 0, G:255, B: 0, A: 255}
   p.Add(bemore)
 
   err = p.Save(9*vg.Inch, 9*vg.Inch, "mainResult.png")
