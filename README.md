@@ -10,7 +10,7 @@ home network or farmshare.
 
 Create a VM Instance in Google Cloud
 ====================================
-Ubuntu 17.04
+Ubuntu 17.04 
 CPU 3.75
 Hard disk 20 GB => will not work with a smaller disk
 
@@ -62,33 +62,31 @@ Differences:
 
 Recommendation for reproducing results:
   
-  1) Run script analyzeStatic.sh to see results in blog post. (30 min)
+1) Run script analyzeStatic.sh to see results in blog post. (30 min)
 
-      $GOPATH/src/github.com/mmx1/sslScanGo/scripts/analyzeStatic.sh
+        $GOPATH/src/github.com/mmx1/sslScanGo/scripts/analyzeStatic.sh
     
-    WARNING: You should not run this script in a directory
+  WARNING: You should not run this script in a directory
     or one monitored by a cloud service such as Dropbox or iCloud Drive, it
     will create a directory with a million files (total size ~20MB).
 
-  2) Run runRand.sh to collect and analyze sample of the data (8 hours)
+2) Run runRand.sh to collect and analyze sample of the data (8 hours)
 
-      * $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runRand.sh > output.txt & disown    
+        $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runRand.sh > output.txt & disown    
 
-  3**) run runall.sh to collect and analyze all 1million domains (12 days)
+3) run runall.sh to collect and analyze all 1million domains (12 days)
     
-      * $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runall.sh > output.txt & disown
+        $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runall.sh > output.txt & disown
 
-    ** don't recommend based on time 
+* Disowning the process will allow you to safely logout, come back, and 
+    inspect the tail of the progress file.
 
-  * Disowning the process will allow you to safely logout, come back, and 
-      inspect the tail of the progress file.
+        tail -f output.txt
 
-    tail -f output.txt
-
-    The script may hang on a few outstanding hosts. If so, you can kill the scanner
+* The script may hang on a few outstanding hosts. If so, you can kill the scanner 
     and manually trigger the populator and analyzer:
 
-    $GOPATH/bin/sslScanGo -populate && $GOPATH/bin/sslScanGo -analyze
+        $GOPATH/bin/sslScanGo -populate && $GOPATH/bin/sslScanGo -analyze
 
     Which will finish in about 2 minutes.
     To view the results:
