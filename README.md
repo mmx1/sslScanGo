@@ -8,6 +8,14 @@ written for CS244 to reproduce the scan results of
 It is highly recommended that you perform this on a cloud VM, not on your
 home network or farmshare.
 
+Create a VM Instance in Google Cloud
+====================================
+Ubuntu 17.04 
+CPU 3.75
+Hard disk 20 GB => will not work with a smaller disk
+
+SSH into the VM and run code below. 
+
 Dependencies
 ============
 This requires the following libraries (and for $GOPATH to be set)
@@ -29,51 +37,65 @@ will fetch the source and its dependencies. This will take approximately
 6 seconds to complete depending on your network connection. 
 
 Scripts
-====
+=========
+Three Main Scripts: 
+1) analyzeStatic.sh
+2) runRand.sh
+3) runall.sh
 
-The main script
+Overview:
+Each script will populate a database with the data and analyze the data
+by creating output files for each main result from the paper (HABJ). After
+creating the output files, the script will initiate a HTTP server on port 80.
+Use the VM's external facing IP address to access the files.
 
-    $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runall.sh
+Differences: 
+1) analyzeStatic.sh -> will not make any queries but will utilize our archived
+  data we captured to create our blog post, so you can see the same results.
+  This script takes about 30 minutes.
+2) runRand.sh -> collects data from a 20000 domain random sample of the 1 million websites. 
+    This script is meant to show a representation of the work in a reasonable amount
+    of time. This script takes 8 hours.
+3) runall.sh -> collectss data from the top 1 million websites, 
+  which is used to create the results in the blog post. This data is archived 
+  for use with analyzeStatic.sh. This script will take 12 DAYS.
 
-will run the entire dataset, and should take ~12 days. To examine a sample, run
+Recommend only running 1 & 2 for reproducing the results:
+  
+1) Run script analyzeStatic.sh to see results in blog post. (30 min)
 
-    $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runRand.sh
-
-which will run 25,000 randomly selected from the top 1 million, should take ~ 8 hours.
-It is recommended that you spawn the task as follows:
-
-    $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runRand.sh > progress.txt & disown
-
-Disowning the process will allow you to safely logout, come back, and 
-inspect the tail of the progress file.
-
-    tail -f output.txt
-
-The script may hang on a few outstanding hosts. If so, you can kill the scanner
-and manually trigger the populator and analyzer:
-
-    $GOPATH/bin/sslScanGo -populate && $GOPATH/bin/sslScanGo -analyze
-
-Which will finish in about 2 minutes.
-To view the results:
+        $GOPATH/src/github.com/mmx1/sslScanGo/scripts/analyzeStatic.sh
     
-    sudo python -m SimpleHTTPServer 80
+  WARNING: You should not run this script in a directory
+    or one monitored by a cloud service such as Dropbox or iCloud Drive, it
+    will create a directory with a million files (total size ~20MB).
 
-View by going to:
+2) Run runRand.sh to collect and analyze sample of the data (8 hours)
 
-    http://externalIPAddress
+        $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runRand.sh > output.txt & disown    
 
-To just analyze our pre-scanned data without running your own scan, run
+3) run runall.sh to collect and analyze all 1million domains (12 days)
+    
+        $GOPATH/src/github.com/mmx1/sslScanGo/scripts/runall.sh > output.txt & disown
 
-    $GOPATH/src/github.com/mmx1/sslScanGo/scripts/analyzeStatic.sh
+* Disowning the process will allow you to safely logout, come back, and 
+    inspect the tail of the progress file.
 
-will extract the archived scan outputs from archive.tar, and run the populator
-and analyzer. This will take approximately 30 minutes. The extraction will
-take a few minutes and show no progress, but the populator will report
-every 10,000 rows filled.
-WARNING: You should not run this script in a directory
-or one monitored by a cloud service such as Dropbox or iCloud Drive, it
-will create a directory with a million files (total size ~20MB).
+        tail -f output.txt
+
+* The script may hang on a few outstanding hosts. If so, you can kill the scanner 
+    and manually trigger the populator and analyzer:
+
+        $GOPATH/bin/sslScanGo -populate && $GOPATH/bin/sslScanGo -analyze
+
+    Which will finish in about 2 minutes.
+    To view the results:
+    
+      sudo python -m SimpleHTTPServer 80
+
+    View by going to:
+
+      http://externalIPAddress
   
 Specific Usage
 =====
@@ -106,7 +128,10 @@ To run the queries on the database:
 
     $GOPATH/bin/sslScanGo -analyze
 
-executes the query code and outputs  files:
+executes the query code and outputs files below. 
+
+Output Files 
+============
   1) BigResult.txt => main result of the paper comparing hosts that utilize
       DHE key exchange for the TLS handshake with the number of hosts that
       utilize weak DHE parameters (i.e. keyexchange bits < authentication
@@ -118,8 +143,3 @@ executes the query code and outputs  files:
   6) TableIV.txt => Enumerating the curves used for EC key exchange suites
   7) TableV.txt => Enumerating authentication algorithms
   8) TableVI.txt => Enumerating authentication key strengths
-
-VM
-==
-For a limited time, a virtual machine (OVA format) is also available with credentials cs244:
-http://web.stanford.edu/~markxue/cs244-vm-15.10.ova
