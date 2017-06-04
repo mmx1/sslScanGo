@@ -85,9 +85,10 @@ func populateDb (dataDir string, outputName string) {
       }
 
       decoder := json.NewDecoder(file)
+      decoderOld := json.NewDecoder(file)
 
       var oldResult ScanResultOld
-      err = decoder.Decode(&oldResult)
+      err = decoderOld.Decode(&oldResult)
       
       if err == nil {
         oldResultChan <- oldResult

@@ -69,7 +69,8 @@ Recommend only running 1 & 2 for reproducing the results:
         $GOPATH/src/github.com/mmx1/sslScanGo/scripts/analyzeStatic.sh
     
   WARNING: You should not run this script in a directory
-    or one monitored by a cloud service such as Dropbox or iCloud Drive, it
+    monitored by a cloud service such as Dropbox or iCloud Drive or
+    add the data folder to a git repository, it
     will create a directory with a million files (total size ~20MB).
 
 2) Run runRand.sh to collect and analyze sample of the data (8 hours)
