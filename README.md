@@ -34,7 +34,7 @@ Fetch Code
     go get github.com/mmx1/sslScanGo
 
 will fetch the source and its dependencies. This will take approximately 
-6 seconds to complete depending on your network connection. 
+1 minute to complete depending on your network connection. 
 
 Scripts
 =========
