@@ -665,7 +665,6 @@ func slicedDHEGraph (db *sql.DB) {
     bars.LineStyle.Width = vg.Length(0)
     bars.Color = plotutil.Color(i)
     offset := float64( i - (len(dheBitSizes) / 2) )
-    fmt.Println(offset)
 
     bars.Offset = vg.Points(20 * offset )
 
