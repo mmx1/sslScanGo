@@ -35,7 +35,7 @@ fi
 if [ $3 ]; then
 	endInd=$3
 fi
-$GOPATH/bin/sslScanGo -r 25000 -start $startInd -end $endInd $filename
+$GOPATH/bin/sslScanGo -r 20000 -start $startInd -end $endInd $filename
 
 rm -f scanDb.sqlite
 
