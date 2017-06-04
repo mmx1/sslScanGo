@@ -23,11 +23,6 @@ func analyze(dbName string) {
   check(err)
   defer db.Close()
 
-  tls11hosts := singleIntQuery("select count (distinct hosts) from handshakes where tlsVersion = 5", db)
-  tls12hosts := singleIntQuery("select count (distinct hosts) from handshakes where tlsVersion = 6", db)
-  fmt.Printf("Found %d TLS 1.1 hosts\n", tls11hosts)
-  fmt.Printf("Found %d TLS 1.2 hosts\n", tls12hosts)
-
   numTLSHosts := printTableI(db)
   printTableII_V(db, numTLSHosts)
   numDHEEnabled := printMainResult(db, numTLSHosts)
